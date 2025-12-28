@@ -41,17 +41,6 @@
 			"versionMinor": 0
 		},
 		{
-			"id": "{D63CB78D-9F5B-42FE-B94C-A545F2B2BFC3}",
-			"isCompilerPackage": true,
-			"licence": "MIT",
-			"name": "[COMPILER PACKAGE] twinBASIC - Common Controls Compatibility Package",
-			"publisher": "TWINBASIC-COMPILER",
-			"versionBuild": 0,
-			"versionMajor": 0,
-			"versionMinor": 0,
-			"versionRevision": 1
-		},
-		{
 			"autoCtlExt": true,
 			"id": "{B00CAB91-2215-4123-9768-F33903B4A788}",
 			"licence": "MIT",
@@ -66,36 +55,6 @@
 			"versionMajor": "1",
 			"versionMinor": "0",
 			"versionRevision": "8"
-		},
-		{
-			"autoCtlExt": true,
-			"id": "{697A5CBF-2012-48BD-9D2F-3EA64CDE149A}",
-			"isCompilerPackage": true,
-			"licence": "MIT",
-			"name": "[COMPILER PACKAGE] twinBASIC - CustomControls Package",
-			"path32": "",
-			"path64": "",
-			"publisher": "TWINBASIC-COMPILER",
-			"symbolId": "CustomControlsPackage",
-			"versionBuild": 0,
-			"versionMajor": 0,
-			"versionMinor": 0,
-			"versionRevision": 5
-		},
-		{
-			"autoCtlExt": true,
-			"id": "{EA18E2B1-80BA-478D-AC7C-E955E6AA1B05}",
-			"isCompilerPackage": true,
-			"licence": "MIT",
-			"name": "[twinBASIC Extension] Custom Controls DESIGNER Library",
-			"path32": "",
-			"path64": "",
-			"publisher": "TWINBASIC-COMPILER",
-			"symbolId": "CustomControls",
-			"versionBuild": 0,
-			"versionMajor": 0,
-			"versionMinor": 0,
-			"versionRevision": 24
 		},
 		{
 			"autoCtlExt": true,
