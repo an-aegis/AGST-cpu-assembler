@@ -1,0 +1,397 @@
+[ClassId("BD8A6150-D312-4287-A251-B98077075D32")]
+Class WaynesSliderState
+    [Description("Controls the fill colors and pattern used to draw the background of the control")]
+    Public WithEvents BackgroundFill As Fill = New Fill
+    [Description("Controls the border used to draw around the background of the control")]
+    Public WithEvents BackgroundBorders As Borders = New Borders
+    [Description("Controls the coner shapes used to draw around the background of the control")]
+    Public WithEvents BackgroundCorners As Corners = New Corners
+    
+    [Description("Controls the fill colors and pattern used to draw the background of the movable block")]
+    Public WithEvents BlockFill As Fill = New Fill
+    [Description("Controls the border used to draw around the background of the movable block")]
+    Public WithEvents BlockBorders As Borders = New Borders
+    [Description("Controls the coner shapes used to draw around the background of the movable block")]
+    Public WithEvents BlockCorners As Corners = New Corners
+    [Description("The width, in pixels, of the Block element of this control")]
+    Public BlockWidth As CustomControls.PixelCount = 100
+    [Description("Controls how the Value text is rendered inside the movable block")]
+    Public WithEvents TextRendering As TextRendering = New TextRendering
+    
+    Event OnChanged()
+    Private Sub OnChanged() Handles BackgroundFill.OnChanged, _
+                                    BackgroundFill.OnPropertySet, _
+                                    BackgroundBorders.OnChanged, _
+                                    BackgroundBorders.OnPropertySet, _
+                                    BackgroundCorners.OnChanged, _
+                                    BackgroundCorners.OnPropertySet, _
+                                    BlockFill.OnChanged, _
+                                    BlockFill.OnPropertySet, _
+                                    BlockBorders.OnChanged, _
+                                    BlockBorders.OnPropertySet, _
+                                    BlockCorners.OnChanged, _
+                                    BlockCorners.OnPropertySet, _
+                                    BlockWidth.OnPropertyLet, _
+                                    TextRendering.OnChanged, _
+                                    TextRendering.OnPropertySet
+        RaiseEvent OnChanged
+    End Sub
+    
+    Public Sub InitializeDefaultValues()
+        BackgroundBorders.SetSimpleBorder(2, vbBlack)
+        BlockFill.ColorPoints.SetSolidColor(ColorSupport.WAYNESCOLOR_BLUE)
+        BlockBorders.SetSimpleBorderRGBA(2, 0)      ' transparent, used for padding the inner element the same as the background border
+    End Sub
+End Class
+
+[CustomControl("/miscellaneous/frmSlider.png")]
+[ClassId("1E704CF9-0DED-4411-878F-95B7142AACAB")]
+[COMCreatable(False)]
+Class WaynesSlider
+    
+    Implements CustomControls.ICustomControl
+    Implements BaseControlFocusable Via _BaseControl = New BaseControlFocusable
+    
+    [Description("Adjusts the interval at which the Value is incremented automatically.  A value of 0 indicates that the control does not move without user interaction.")]
+    Public MoveInterval As Long
+    [Description("Indicates whether the MinValue and MaxValue properties are strictly enforced.  If not, values outside of the range are allowed and the Block will overflow repeatedly")]
+    Public WrapAround As Boolean
+    [Description("Adjusts the position of the Block element")]
+    Public Value As Long
+    [Description("Adjusts the minimum part of the range of acceptable values")]
+    Public MinValue As Long = 0
+    [Description("Adjusts the maximum part of the range of acceptable values")]
+    Public MaxValue As Long = 100
+    [Description("Adjusts the step amount by which the Value is incremented or decremented")]
+    Public StepValue As Long = 1
+    [Description("Adjusts the paging step amount by which the Value is incremented or decremented when moving the Block via clicking on the Background element")]
+    Public PagingStepValue As Long = 1
+
+    [Description("Controls how the control is rendered in its normal state")]
+    Public WithEvents NormalState As WaynesSliderState = New WaynesSliderState
+    [Description("Controls how the control is rendered when the mouse is hovered over it")]
+    Public WithEvents HoverState As WaynesSliderState = New WaynesSliderState
+    [Description("Controls how the control is rendered when it is focused")]
+    Public WithEvents FocusedState As WaynesSliderState = New WaynesSliderState
+        
+    Enum SliderDirection
+        Horizontal
+        Vertical
+    End Enum
+    
+    [Description("Adjust the direction in which the control is painted")]
+    Public Direction As SliderDirection = SliderDirection.Horizontal
+    
+    Enum SliderDisplayValueFormat
+        DisplayValue
+        DisplayPercentage
+        DisplayNone
+    End Enum
+    
+    [Description("Adjust how the Value is display on the control")]
+    Public DisplayFormat As SliderDisplayValueFormat = SliderDisplayValueFormat.DisplayValue
+
+    Private WithEvents MouseDownRepeatTimer As CustomControlTimer
+    Private MouseDownRepeatTimerAmount As Long
+    Private MouseDownRepeatTimerTarget As Long
+    Private IsDragging As Boolean
+    Private DragOriginalPosition As CustomControls.PixelCount
+    Private DragOriginalPositionStart As CustomControls.PixelCount
+    Private IsHovering As Boolean
+    Private IsFocused As Boolean
+    Private PixelsPerValue As Double
+    Private LastPaintBlockMidPoint As Long
+    
+    Const MOUSEDOWN_TIMER_INTERVAL_INITIAL_DELAY As Long = 500
+    Const MOUSEDOWN_TIMER_INTERVAL As Long = 40
+    
+    Private Sub OnChanged() Handles _BaseControl.OnChanged, _
+                                    MoveInterval.OnPropertyLet, _
+                                    WrapAround.OnPropertyLet, _
+                                    Value.OnPropertyLet, _
+                                    MinValue.OnPropertyLet, _
+                                    MaxValue.OnPropertyLet, _
+                                    StepValue.OnPropertyLet, _
+                                    PagingStepValue.OnPropertyLet, _
+                                    NormalState.OnChanged, _
+                                    NormalState.OnPropertySet, _
+                                    HoverState.OnChanged, _
+                                    HoverState.OnPropertySet, _
+                                    FocusedState.OnChanged, _
+                                    FocusedState.OnPropertySet, _
+                                    Direction.OnPropertyLet, _
+                                    DisplayFormat.OnPropertyLet
+        If Me.ControlContext IsNot Nothing Then Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub InitializeDefaultValues()
+        Me.NormalState.InitializeDefaultValues
+        Me.HoverState.InitializeDefaultValues
+        Me.FocusedState.InitializeDefaultValues
+        
+        If Me.Height > Me.Width Then
+            Direction = SliderDirection.Vertical
+        End If
+    End Sub
+        
+    Private Sub OnHoverEnter(ByRef EventInfo As MouseEvent)
+        Me.IsHovering = True
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnHoverLeave(ByRef EventInfo As MouseEvent)
+        Me.IsHovering = False
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnGotFocus(ByRef EventInfo As FocusEvent)
+        Me.IsFocused = True
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnLostFocus(ByRef EventInfo As FocusEvent)
+        Me.IsFocused = False
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnBackgroundMouseDown(ByRef EventInfo As MouseEvent)
+        Dim position As Long = If(Me.Direction = SliderDirection.Horizontal, EventInfo.PositionX, EventInfo.PositionY)
+            
+        If position < LastPaintBlockMidPoint Then
+            Me.Value -= Me.PagingStepValue
+            MouseDownRepeatTimerAmount = -Me.PagingStepValue
+        Else
+            Me.Value += Me.PagingStepValue
+            MouseDownRepeatTimerAmount = Me.PagingStepValue
+        End If
+        
+        Me.MouseDownRepeatTimerTarget = position
+        Me.MouseDownRepeatTimer.Interval = MOUSEDOWN_TIMER_INTERVAL_INITIAL_DELAY
+        Me.MouseDownRepeatTimer.Enabled = True
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnBackgroundMouseUp(ByRef EventInfo As MouseEvent)
+       MouseDownRepeatTimer.Enabled = False
+    End Sub
+    
+    Private Sub OnKeyDown(ByRef EventInfo As KeyEvent)
+        If Me.Direction = SliderDirection.Horizontal Then
+            Select Case EventInfo.KeyCode
+                Case KeyCodeConstants.vbKeyLeft
+                    Me.Value -= Me.PagingStepValue
+                Case KeyCodeConstants.vbKeyRight
+                    Me.Value += Me.PagingStepValue
+            End Select
+        Else
+            Select Case EventInfo.KeyCode
+                Case KeyCodeConstants.vbKeyUp
+                    Me.Value -= Me.PagingStepValue
+                Case KeyCodeConstants.vbKeyDown
+                    Me.Value += Me.PagingStepValue
+            End Select
+        End If
+        Me.ControlContext.Repaint
+    End Sub
+
+    Private Sub OnKeyUp(ByRef EventInfo As KeyEvent)
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnInitialize(ByVal ControlContext As CustomControls.CustomControlContext) _
+            Implements ICustomControl.Initialize
+        If Not ControlContext.GetSerializer.RuntimeUISrzDeserialize(Me) Then
+            InitializeDefaultValues
+        End If
+        Set Me.ControlContext = ControlContext
+        Set Me.MouseDownRepeatTimer = CType(Of CustomControlTimer)(ControlContext.CreateTimer())
+    End Sub
+
+    Private Sub OnDestroy() _
+        Implements ICustomControl.Destroy
+    End Sub
+    
+    Private Sub OnPaint(ByVal Canvas As CustomControls.Canvas) _
+        Implements ICustomControl.Paint
+        
+        Dim ActiveState As WaynesSliderState
+        
+        If Me.IsHovering Then
+            Set ActiveState = Me.HoverState
+        ElseIf Me.IsFocused Then
+            Set ActiveState = Me.FocusedState
+        Else
+            Set ActiveState = Me.NormalState
+        End If
+        
+        ' paint the background fill
+        Dim descriptor As ElementDescriptor
+        With descriptor
+            .Left = 0
+            .Top = 0
+            .Width = Canvas.RuntimeUICCGetWidth()
+            .Height = Canvas.RuntimeUICCGetHeight()
+            Set .BackgroundFill = ActiveState.BackgroundFill
+            Set .Borders = ActiveState.BackgroundBorders
+            Set .Corners = ActiveState.BackgroundCorners
+            .OnMouseDown = AddressOf OnBackgroundMouseDown
+            .OnMouseUp = AddressOf OnBackgroundMouseUp
+            Canvas.RuntimeUICCCanvasAddElement(descriptor)
+        End With
+        
+        Dim BlockWidth As Long = CLng(ActiveState.BlockWidth * Canvas.RuntimeUICCGetDpiScaleFactor())
+        Dim BlockPaddingStart As Long = BlockWidth \ 2
+        Dim Value As Long = Me.Value
+        
+        If Me.WrapAround = False Then
+            ' FIXME should restrict the value in the Value property-let instead
+            Value = Max(Value, Me.MinValue)
+            Value = Min(Value, Me.MaxValue)
+        End If
+        
+        If Me.StepValue > 1 Then   ' FIXME should throw error on prop-let if invalid
+            Dim offsetValue As Long = Value - Me.MinValue
+            Value -= offsetValue Mod Me.StepValue
+        End If
+        
+        Dim Range As Long = Me.MaxValue - Me.MinValue
+        Dim PositionPercent As Double = (Value - Me.MinValue) / Range
+        Dim CanvasWidthRange As Long
+        If Me.Direction = SliderDirection.Horizontal Then
+            CanvasWidthRange = Canvas.RuntimeUICCGetWidth() - BlockWidth
+        Else
+            CanvasWidthRange = Canvas.RuntimeUICCGetHeight() - BlockWidth
+        End If
+        Dim BlockMidPoint As Long = CLng(BlockPaddingStart + (PositionPercent * CanvasWidthRange))
+         
+        Dim BlockLeftPoint As Long = CLng(BlockMidPoint - (BlockWidth / 2))
+        Dim BlockRightPoint As Long = CLng(BlockMidPoint + (BlockWidth / 2))
+        Me.PixelsPerValue = CanvasWidthRange / Range
+        
+        ' Prepare an ElementDescriptor with the common values
+        Dim blockDescriptor As ElementDescriptor
+        With blockDescriptor
+            Select Case Me.DisplayFormat
+                Case SliderDisplayValueFormat.DisplayPercentage
+                    .Text = FormatPercent(PositionPercent, 1)
+                Case SliderDisplayValueFormat.DisplayValue
+                    .Text = Value
+            End Select
+
+            Set .BackgroundFill = ActiveState.BlockFill
+            Set .TextRenderingOptions = ActiveState.TextRendering
+            Set .Borders = ActiveState.BlockBorders
+            Set .Corners = ActiveState.BlockCorners
+            .TrackingIdX = 1
+            .ElementTabIndex = 0
+            .ElementTabStop = True
+            .Cursor = MousePointerConstants.vbHand
+            .OnMouseDown = AddressOf BlockDragStart
+            .OnMouseMove = AddressOf BlockDragMove
+            .OnMouseUp = AddressOf BlockDragEnd
+            .OnGotFocus = AddressOf OnGotFocus
+            .OnLostFocus = AddressOf OnLostFocus
+            .OnMouseEnter = AddressOf OnHoverEnter
+            .OnMouseLeave = AddressOf OnHoverLeave
+            .OnKeyDown = AddressOf OnKeyDown
+            .OnKeyUp = AddressOf OnKeyUp
+        End With
+        
+        If Me.Direction = SliderDirection.Horizontal Then
+            blockDescriptor.Width = BlockWidth
+            blockDescriptor.Height = Canvas.RuntimeUICCGetHeight()
+        
+            If BlockRightPoint > Canvas.RuntimeUICCGetWidth() Then
+                ' wrap-around to the left.  the left area being out of the clip region doesn't matter as tB handles all of that.
+                With blockDescriptor
+                    .Left = ((BlockLeftPoint Mod Canvas.RuntimeUICCGetWidth()) - Canvas.RuntimeUICCGetWidth())
+                    Canvas.RuntimeUICCCanvasAddElement(blockDescriptor)
+                End With
+            End If
+            
+            With blockDescriptor
+                .Left = BlockLeftPoint Mod Canvas.RuntimeUICCGetWidth()
+                Canvas.RuntimeUICCCanvasAddElement(blockDescriptor)
+            End With
+            
+            Me.LastPaintBlockMidPoint = blockDescriptor.Left + BlockPaddingStart
+            
+            If BlockLeftPoint < 0 Then
+                ' wrap-around to the right.  the right area being out of the clip region doesn't matter as tB handles all of that.
+                With blockDescriptor
+                    .Left = (Canvas.RuntimeUICCGetWidth() + BlockLeftPoint) Mod Canvas.RuntimeUICCGetWidth()
+                    Canvas.RuntimeUICCCanvasAddElement(blockDescriptor)
+                End With
+            End If
+        Else
+            blockDescriptor.Width = Canvas.RuntimeUICCGetWidth()
+            blockDescriptor.Height = BlockWidth
+        
+            If BlockRightPoint > Canvas.RuntimeUICCGetHeight() Then
+                ' wrap-around to the left.  the left area being out of the clip region doesn't matter as tB handles all of that.
+                With blockDescriptor
+                    .Top = ((BlockLeftPoint Mod Canvas.RuntimeUICCGetHeight()) - Canvas.RuntimeUICCGetHeight())
+                    Canvas.RuntimeUICCCanvasAddElement(blockDescriptor)
+                End With
+            End If
+            
+            With blockDescriptor
+                .Top = BlockLeftPoint Mod Canvas.RuntimeUICCGetHeight()
+                Canvas.RuntimeUICCCanvasAddElement(blockDescriptor)
+            End With
+            
+            Me.LastPaintBlockMidPoint = blockDescriptor.Top + BlockPaddingStart
+            
+            If BlockLeftPoint < 0 Then
+                ' wrap-around to the right.  the right area being out of the clip region doesn't matter as tB handles all of that.
+                With blockDescriptor
+                    .Top = (Canvas.RuntimeUICCGetHeight() + BlockLeftPoint) Mod Canvas.RuntimeUICCGetHeight()
+                    Canvas.RuntimeUICCCanvasAddElement(blockDescriptor)
+                End With
+            End If
+        End If
+    End Sub
+    
+    Private Sub BlockDragStart(ByRef EventInfo As MouseEvent)
+        Dim position As Long = If(Me.Direction = SliderDirection.Horizontal, EventInfo.PositionX, EventInfo.PositionY)
+        Me.IsDragging = True
+        Me.DragOriginalPosition = CType(Of PixelCount)(Me.Value)
+        Me.DragOriginalPositionStart = CType(Of PixelCount)(position)
+    End Sub
+    
+    Private Sub BlockDragMove(ByRef EventInfo As MouseEvent)
+        If Me.IsDragging = True Then
+            Dim position As Long = If(Me.Direction = SliderDirection.Horizontal, EventInfo.PositionX, EventInfo.PositionY)
+            Dim xDiff As Long = position - Me.DragOriginalPositionStart
+            Me.Value = CLng(Me.DragOriginalPosition + (xDiff / Me.PixelsPerValue))
+            Me.ControlContext.Repaint
+        End If
+    End Sub
+    
+    Private Sub BlockDragEnd(ByRef EventInfo As MouseEvent)
+        If Me.IsDragging = True Then
+            Me.IsDragging = False
+            Me.ControlContext.Repaint
+        End If
+    End Sub
+        
+    Private Sub MouseDownRepeatTimerEvent() Handles MouseDownRepeatTimer.OnTimer
+        
+        If Me.MouseDownRepeatTimerAmount > 0 Then
+            If Me.LastPaintBlockMidPoint >= Me.MouseDownRepeatTimerTarget Then
+                MouseDownRepeatTimer.Enabled = False
+                Exit Sub
+            End If
+        Else
+            If Me.LastPaintBlockMidPoint <= Me.MouseDownRepeatTimerTarget Then
+                MouseDownRepeatTimer.Enabled = False
+                Exit Sub
+            End If
+        End If
+        
+        Me.MouseDownRepeatTimer.Interval = MOUSEDOWN_TIMER_INTERVAL
+        Me.Value += MouseDownRepeatTimerAmount
+        Me.ControlContext.Repaint
+    End Sub
+    
+End Class

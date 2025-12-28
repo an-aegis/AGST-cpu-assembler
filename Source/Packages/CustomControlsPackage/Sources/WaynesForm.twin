@@ -1,0 +1,95 @@
+' NOTE: at the moment, WaynesForm is hardcoded as the root control for all forms
+' (soon we will allow other base form controls, and allow choosing between them)
+[CustomControl("/miscellaneous/frmFrame.png")]
+[ClassId("18C42F40-B03D-474E-B99E-7853A314E664")]
+[COMCreatable(False)]
+Class WaynesForm
+     
+    Implements CustomControls.ICustomControl
+    Implements BaseForm Via _BaseForm = New BaseForm
+    
+    Event Click()
+     
+    [Description("Adjusts the caption of the title bar for this form")]
+    Public Caption As String
+    [Description("Controls the fill colors and pattern used to draw the background of the form")]
+    Public WithEvents BackgroundFill As Fill = New Fill
+    [Description("Controls Windows-specific options about the form position and window state")]
+    Public WithEvents WindowsOptions As WindowsFormOptions = New WindowsFormOptions
+    
+    Private Sub OnChanged() Handles _BaseForm.OnChanged, _
+                                    Caption.OnPropertyLet, _
+                                    BackgroundFill.OnChanged, _
+                                    BackgroundFill.OnPropertySet, _
+                                    WindowsOptions.OnChanged, _
+                                    WindowsOptions.OnPropertySet
+        If Me.ControlContext IsNot Nothing Then Me.ControlContext.Repaint
+    End Sub
+
+    Private Sub InitializeDefaultValues()
+        Me.BackgroundFill.ColorPoints.SetSolidColor(ColorSupport.WAYNESCOLOR_LIGHTGREY)
+    End Sub
+    
+    ' public members here will also be exposed on root forms via implicit inheritence
+    Public Sub Show(Optional ByVal Modal As FormShowConstants)
+        'Stop
+        If Modal = FormShowConstants.vbModeless Then
+            Debug.Print "Sorry, twinBASIC doesn't yet support non-modal forms.  To show a modal form use Show(vbModal)"
+            '     Err.Raise 5, , "Sorry, twinBASIC doesn't yet support non-modal forms.  To show a modal form use Show(vbModal)"
+        End If
+        Me.ControlContext.Show()
+    End Sub
+    
+    Public Sub StartupShow()
+        Me.ControlContext.Show()
+    End Sub
+    
+    Public Sub Close()
+        Me.ControlContext.Close()
+    End Sub
+    
+    Private IsInitialized As Boolean
+    Private Sub OnInitialize(ByVal ControlContext As CustomControls.CustomControlContext) _
+            Implements ICustomControl.Initialize
+        If IsInitialized = False Then
+            'Stop
+            IsInitialized = True
+            If Not ControlContext.GetSerializer.RuntimeUISrzDeserialize(Me) Then
+                InitializeDefaultValues
+            End If
+            Set Me.ControlContext = CType(Of CustomFormContext)(ControlContext)
+        End If
+    End Sub
+    
+    Private Sub OnDestroy() _
+        Implements ICustomControl.Destroy
+        'MsgBox "WaynesForm::OnDestroy"
+    End Sub
+    
+    Private Sub Class_Terminate()
+        MsgBox "WaynesForm::Terminated"
+    End Sub
+     
+    Private Sub OnClick(ByRef EventInfo As MouseEvent)
+        RaiseEvent Click
+    End Sub
+
+    Private Sub OnPaint(ByVal Canvas As CustomControls.Canvas) _
+        Implements ICustomControl.Paint
+           
+        Dim descriptor As ElementDescriptor
+        With descriptor
+            .Left = 0
+            .Top = 0
+            .Width = Canvas.RuntimeUICCGetWidth()
+            .Height = Canvas.RuntimeUICCGetHeight()
+            Set .BackgroundFill = Me.BackgroundFill
+            .TrackingIdX = 1000
+            .TrackingIdY = 1000
+            .OnClick = AddressOf OnClick
+            Canvas.RuntimeUICCCanvasAddElement(descriptor)
+        End With
+        
+    End Sub
+    
+End Class

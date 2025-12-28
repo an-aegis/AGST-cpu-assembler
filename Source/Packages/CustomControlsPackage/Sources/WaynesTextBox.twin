@@ -1,0 +1,602 @@
+[ClassId("2C2B1BF8-E77B-4B54-B02A-E313F6EDE27A")]
+[COMCreatable(False)]
+Class WaynesTextBoxState
+    [Description("Controls the fill colors and pattern used to draw the background of the label")]
+    Public WithEvents BackgroundFill As Fill = New Fill
+    [Description("Controls how the Value text is rendered")]
+    Public WithEvents TextRendering As TextRendering = New TextRendering
+    [Description("Controls how the corner shapes are rendered")]
+    Public WithEvents Corners As Corners = New Corners
+    [Description("Controls how the borders of the textbox are rendered")]
+    Public WithEvents Borders As Borders = New Borders
+    
+    [Description("Controls how the background color of selected text part of Value is rendered")]
+    Public WithEvents SelectedBackgroundFill As Fill = New Fill
+    [Description("Controls how the font text color of selected text part of Value is rendered")]
+    Public WithEvents SelectedTextFill As Fill = New Fill
+    [Description("Controls how the caret is rendered")]
+    Public WithEvents CaretFill As Fill = New Fill
+    [Description("Controls the width of the caret, in pixels")]
+    Public CaretWidth As Long
+    
+    [Description("Controls the color of the squiggle decorator for ERROR text")]
+    Public WithEvents DecorationERROR As Fill = New Fill
+    [Description("Controls the color of the squiggle decorator for WARNING text")]
+    Public WithEvents DecorationWARNING As Fill = New Fill
+    [Description("Controls the color of the squiggle decorator for INFO text")]
+    Public WithEvents DecorationINFO As Fill = New Fill
+    
+    Event OnChanged()
+    Private Sub OnChanged() Handles BackgroundFill.OnChanged, _
+                                    BackgroundFill.OnPropertySet, _
+                                    TextRendering.OnChanged, _
+                                    TextRendering.OnPropertySet, _
+                                    Corners.OnChanged, _
+                                    Corners.OnPropertySet, _
+                                    Borders.OnChanged, _
+                                    Borders.OnPropertySet, _    
+                                    SelectedBackgroundFill.OnChanged, _
+                                    SelectedBackgroundFill.OnPropertySet, _    
+                                    SelectedTextFill.OnChanged, _
+                                    SelectedTextFill.OnPropertySet, _    
+                                    CaretFill.OnChanged, _
+                                    CaretFill.OnPropertySet, _
+                                    CaretWidth.OnPropertyLet, _
+                                    DecorationERROR.OnChanged, _
+                                    DecorationERROR.OnPropertySet, _
+                                    DecorationWARNING.OnChanged, _
+                                    DecorationWARNING.OnPropertySet, _
+                                    DecorationINFO.OnChanged, _
+                                    DecorationINFO.OnPropertySet
+        RaiseEvent OnChanged
+    End Sub
+
+
+    
+    Public Sub InitializeDefaultValues()
+        Corners.SetAll(tbCurve, 5)
+        BackgroundFill.ColorPoints.SetSolidColor(ColorConstants.vbWhite)
+        TextRendering.Alignment = TextAlignment.tbAlignMiddleLeft
+        TextRendering.OverflowMode = TextOverflowMode.tbDisallowPartialChars
+        TextRendering.Padding.Left = 5
+        TextRendering.Padding.Right = 5
+        Borders.SetSimpleBorder(1, ColorConstants.vbBlack)
+        CaretWidth = 1
+        SelectedBackgroundFill.ColorPoints.SetSolidColor(&HA0A0A0) ' grey
+        SelectedTextFill.ColorPoints.SetSolidColor(ColorConstants.vbWhite)
+        CaretFill.ColorPoints.SetSolidColor(ColorConstants.vbBlack)
+        DecorationERROR.ColorPoints.SetSolidColor(ColorConstants.vbRed)
+        DecorationWARNING.ColorPoints.SetSolidColor(&H7E5316)     ' dark blue
+        DecorationINFO.ColorPoints.SetSolidColor(&H32C2F1)
+    End Sub
+    
+    Public Sub InitializeDefaultValues_Focused()
+        InitializeDefaultValues()
+        SelectedBackgroundFill.ColorPoints.SetSolidColor(&HC6853D) ' blue
+        CaretFill.ColorPoints.SetSolidColor(&H007ECE) ' orange
+    End Sub
+End Class
+
+[CustomControl("/miscellaneous/frmTextbox.png")]
+[ClassId("28BA97E5-B557-4639-B4B2-023F438959BD")]
+[COMCreatable(False)]
+Class WaynesTextBox
+    
+    Option Compare Text
+    
+    Implements CustomControls.ICustomControl
+    Implements BaseControlFocusable Via _BaseControl = New BaseControlFocusable
+
+    [Description("Controls how the control is rendered in its normal state")]
+    Public WithEvents NormalState As WaynesTextBoxState = New WaynesTextBoxState
+    [Description("Controls how the control is rendered when the mouse is hovered over it")]
+    Public WithEvents HoverState As WaynesTextBoxState = New WaynesTextBoxState
+    [Description("Controls how the control is rendered when it is focused")]
+    Public WithEvents FocusedState As WaynesTextBoxState = New WaynesTextBoxState
+    
+    [Description("Adjusts the text displayed on this label")]
+    Public Value As String = "Textbox"
+    
+    Private CaretPosition As CaretPosition = CaretPosition.CaretPositionNone
+    Private PreservedCaretPosition As CaretPosition = CaretPosition.CaretPositionNone
+    Private IsDragging As Boolean
+    Private StartDragX As Long
+    Private IsHovering As Boolean
+    Private IsFocused As Boolean
+    
+    [Description("The selected text start point (caret position), in character indices")]
+    Private SelStart As Long
+    [Description("The selected text length, in character indices")]
+    Private SelLength As Long
+    
+    Private Sub OnChanged() Handles _BaseControl.OnChanged, _
+                                    NormalState.OnChanged, _
+                                    NormalState.OnPropertySet, _
+                                    HoverState.OnChanged, _
+                                    HoverState.OnPropertySet, _
+                                    FocusedState.OnChanged, _
+                                    FocusedState.OnPropertySet, _
+                                    Value.OnPropertyLet
+        If Me.ControlContext IsNot Nothing Then Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub InitializeDefaultValues()
+        NormalState.InitializeDefaultValues()
+        HoverState.InitializeDefaultValues()
+        FocusedState.InitializeDefaultValues_Focused()
+    End Sub
+     
+    Private Function GetWordRangeAtPosition(X As Long, AdvanceWord As Long = 0) As Range
+        Dim ValueLen As Long = Len(Value)
+        Dim charIndex As Long
+        Dim LastWordBreak As Long = 1
+        Dim RetVal As Range
+        Dim FoundWord As Boolean
+        
+        For charIndex = 1 To ValueLen
+            If charIndex = X Then
+                FoundWord = True
+            End If
+
+            If Mid$(Value, charIndex, 1) = " " Then
+                If FoundWord Then
+                    If charIndex = X AndAlso AdvanceWord = 1 Then
+                        X += 1
+                    Else
+                        Exit For
+                    End If
+                ElseIf (charIndex + 1) = X AndAlso AdvanceWord = -1 Then
+                    FoundWord = True
+                    Exit For
+                End If
+                LastWordBreak = charIndex + 1
+            End If
+        Next
+        
+        If charIndex = X Then
+            FoundWord = True
+        End If
+        
+        If FoundWord Then
+            RetVal.Start = LastWordBreak
+            RetVal.Length = charIndex - LastWordBreak
+        End If
+        
+        Return RetVal
+    End Function
+    
+    Private Function GetCaretPosition() As Long
+        If Me.CaretPosition = CaretPosition.CaretPositionStart Then
+            Return Me.SelStart
+        ElseIf Me.CaretPosition = CaretPosition.CaretPositionEnd Then
+            Return Me.SelStart + Me.SelLength
+        End If
+    End Function
+    
+    Private Function GetCurrentSelectedText() As String
+        Return Mid$(Me.Value, Me.SelStart, Me.SelLength)
+    End Function
+    
+    Private Sub ReplaceSelectedText(replaceValue As String)
+        If Me.SelStart = 0 Then Exit Sub
+        Me.Value = VBA.Left$(Me.Value, Me.SelStart - 1) & replaceValue & Mid$(Me.Value, Me.SelStart + Me.SelLength)
+        Me.SelStart += Len(replaceValue)
+        Me.SelLength = 0
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Function IsSurrogateHighPart(CharValue As Long) As Boolean
+        Return (CharValue >= &HD800&) AndAlso (CharValue <= &HDBFF&)
+    End Function
+    
+    Private Function IsSurrogateLowPart(CharValue As Long) As Boolean
+        Return (CharValue >= &HDC00&) AndAlso (CharValue <= &HDFFF&)
+    End Function
+    
+    [Description("Indicates if the start of the selection range lands on a surrogate pair start character")]
+    Private Function IsSelStartSurrogateFirst() As Boolean
+        If (Me.SelStart = 0) OrElse (Me.SelStart > Len(Me.Value)) Then Return False
+        Return IsSurrogateHighPart(AscW(Mid$(Me.Value, Me.SelStart, 1)))
+    End Function
+    
+    [Description("Indicates if the start of the selection range lands on a surrogate pair end character")]
+    Private Function IsSelStartSurrogateLast() As Boolean
+        If (Me.SelStart = 0) OrElse (Me.SelStart > Len(Me.Value)) Then Return False
+        Return IsSurrogateLowPart(AscW(Mid$(Me.Value, Me.SelStart, 1)))
+    End Function
+    
+    [Description("Indicates if the end of the selection range lands on a surrogate pair end character")]
+    Private Function IsSelEndSurrogateLast() As Boolean
+        Dim endPos As Long = Me.SelStart + Me.SelLength
+        If endPos > Len(Me.Value) Then Return False
+        Return IsSurrogateLowPart(AscW(Mid$(Me.Value, endPos, 1)))
+    End Function
+
+    Private Sub MoveCaretBackwards()
+        If Me.SelStart > 1 Then
+            Me.SelStart -= 1
+            If (Me.SelStart > 1) AndAlso IsSelStartSurrogateLast() Then
+                ' We landed on the end character of a surrogate pair, so move another step to land on the beginning of the surrogate pair
+                Me.SelStart -= 1
+            End If
+        End If
+    End Sub
+        
+    ' FIXME this needs tests and refactoring
+    Private Sub HandleKeyArrowLeft(EventInfo As KeyEvent)
+        Dim wordRange As Range
+        Dim caretPos As Long
+        Dim newCaretPos As Long
+
+        If EventInfo.ControlKeyDown Then
+            If EventInfo.ShiftKeyDown Then
+                If Me.CaretPosition = CaretPosition.CaretPositionStart OrElse Me.SelLength = 0 Then
+                    caretPos = GetCaretPosition()
+                    wordRange = GetWordRangeAtPosition(caretPos, -1)
+                    Me.SelLength = (Me.SelStart + Me.SelLength) - wordRange.Start
+                    Me.SelStart = wordRange.Start
+                    Me.CaretPosition = CaretPosition.CaretPositionStart
+                ElseIf Me.CaretPosition = CaretPosition.CaretPositionEnd Then
+                    ' here we need to reduce the current selection (to 0 if necessary)
+                    caretPos = GetCaretPosition()
+                    wordRange = GetWordRangeAtPosition(caretPos)
+                    newCaretPos = wordRange.Start
+                    If newCaretPos <= Me.SelStart Then
+                        Me.SelLength = 0
+                        Me.CaretPosition = CaretPosition.CaretPositionEnd
+                    Else
+                        Me.SelLength = (newCaretPos - Me.SelStart) - 1
+                        Me.CaretPosition = CaretPosition.CaretPositionEnd
+                    End If
+                End If
+            Else
+                caretPos = GetCaretPosition()
+                wordRange = GetWordRangeAtPosition(caretPos, -1)
+                Me.SelLength = 0
+                Me.SelStart = wordRange.Start
+                Me.CaretPosition = CaretPosition.CaretPositionEnd
+            End If
+        ElseIf EventInfo.ShiftKeyDown = False Then
+            If Me.SelStart > 1 AndAlso Me.SelLength = 0 Then MoveCaretBackwards
+            Me.SelLength = 0
+            Me.CaretPosition = CaretPosition.CaretPositionEnd
+        Else
+            If Me.SelLength > 0 Then
+                If Me.CaretPosition = CaretPosition.CaretPositionStart Then
+                    If Me.SelStart > 1 Then
+                        Me.SelStart -= 1
+                        If IsSelStartSurrogateLast() Then
+                            Me.SelStart -= 1
+                            Me.SelLength += 2
+                        Else
+                            Me.SelLength += 1
+                        End If
+                    End If
+                Else
+                    Me.SelLength -= 1
+                    If IsSelEndSurrogateLast() Then
+                        Me.SelLength -= 1
+                    End If
+                End If
+            Else
+                If Me.SelStart > 1 Then
+                    Me.SelStart -= 1
+                    If IsSelStartSurrogateLast() Then
+                        Me.SelStart -= 1
+                        Me.SelLength = 2
+                    Else
+                        Me.SelLength = 1
+                    End If
+                    Me.CaretPosition = CaretPosition.CaretPositionStart
+                End If
+            End If
+        End If
+        Me.ControlContext.Repaint
+    End Sub
+    
+    ' FIXME this needs tests and refactoring
+    Private Sub HandleKeyArrowRight(EventInfo As KeyEvent)
+        Dim wordRange As Range
+        Dim caretPos As Long
+        Dim newCaretPos As Long
+
+        If EventInfo.ControlKeyDown Then
+            If EventInfo.ShiftKeyDown Then
+                If Me.CaretPosition = CaretPosition.CaretPositionEnd OrElse Me.SelLength = 0 Then
+                    caretPos = GetCaretPosition()
+                    wordRange = GetWordRangeAtPosition(caretPos, 1)
+                    Me.SelLength = (wordRange.Start + wordRange.Length) - Me.SelStart
+                ElseIf Me.CaretPosition = CaretPosition.CaretPositionStart Then
+                    ' here we need to reduce the current selection (to 0 if necessary)
+                    caretPos = GetCaretPosition()
+                    wordRange = GetWordRangeAtPosition(caretPos)
+                    newCaretPos = wordRange.Start + wordRange.Length + 1
+                    If newCaretPos >= (caretPos + Me.SelLength) Then
+                        Me.SelStart = caretPos + Me.SelLength
+                        Me.SelLength = 0
+                        Me.CaretPosition = CaretPosition.CaretPositionEnd
+                    Else
+                        Me.SelLength = (Me.SelStart + Me.SelLength) - newCaretPos
+                        Me.SelStart = newCaretPos
+                        Me.CaretPosition = CaretPosition.CaretPositionStart
+                    End If
+                End If
+            Else
+                caretPos = GetCaretPosition()
+                wordRange = GetWordRangeAtPosition(caretPos, 1)
+                Me.SelLength = 0
+                Me.SelStart = wordRange.Start + wordRange.Length
+                Me.CaretPosition = CaretPosition.CaretPositionEnd
+            End If
+        ElseIf EventInfo.ShiftKeyDown = False Then
+            If Me.SelLength = 0 Then Me.SelLength = If(IsSelStartSurrogateFirst(), 2, 1)
+            Dim newPos As Long = Me.SelStart + Me.SelLength
+            If (newPos - 1) <= Len(Me.Value) Then Me.SelStart = newPos
+            Me.SelLength = 0
+            Me.CaretPosition = CaretPosition.CaretPositionEnd
+        Else
+            If Me.SelLength > 0 Then
+                If Me.CaretPosition = CaretPosition.CaretPositionStart Then
+                    If IsSelStartSurrogateLast() Then
+                        Me.SelLength -= 2
+                        Me.SelStart += 2
+                    Else
+                        Me.SelLength -= 1
+                        Me.SelStart += 1
+                    End If
+                Else
+                    If (Me.SelStart + Me.SelLength) <= Len(Me.Value) Then
+                        Me.SelLength += 1
+                        If IsSelEndSurrogateLast() Then
+                            Me.SelLength += 1
+                        End If
+                    End If
+                End If
+            Else
+                If Me.SelStart <= Len(Me.Value) Then
+                    Me.SelLength = If(IsSelStartSurrogateFirst(), 2, 1)
+                    Me.CaretPosition = CaretPosition.CaretPositionEnd
+                End If
+            End If
+        End If
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnKeyDown(EventInfo As KeyEvent)
+        ' Debug.Print "OnKeyDown: " & ChrW(EventInfo.KeyCode)
+        
+        Select Case EventInfo.KeyCode
+            
+            Case vbKeyDelete
+                If Me.SelLength = 0 Then
+                    Me.SelLength = If(IsSelStartSurrogateFirst(), 2, 1)
+                End If
+                ReplaceSelectedText("")
+                
+            Case vbKeyLeft
+                HandleKeyArrowLeft(EventInfo)
+
+            Case vbKeyRight
+                HandleKeyArrowRight(EventInfo)
+
+        End Select
+
+    End Sub
+    
+    ' FIXME this needs locale aware cut/copy/paste/selectall hotkeys
+    Private Sub OnKeyPress(EventInfo As KeyEvent)
+        Debug.Print "OnKeyPress: " & EventInfo.KeyCode & " [" & Hex(EventInfo.KeyCode) & "] " & " (Me.SelStart: " & Me.SelStart & ")"
+        
+        Select Case CLng(EventInfo.KeyCode)
+            Case vbKeyBack
+                If Me.SelLength = 0 Then
+                    Me.SelStart -= 1
+                    If IsSelStartSurrogateLast() Then
+                        Me.SelStart -= 1
+                        Me.SelLength = 2
+                    Else
+                        Me.SelLength = 1
+                    End If
+                    
+                    If Me.SelStart = 0 Then
+                        Me.SelStart = 1
+                        Me.SelLength = 0
+                        Exit Sub
+                    End If
+                End If
+                ReplaceSelectedText("")
+                
+            Case SpecialKeyCodes.SelectAll
+                Me.SelStart = 1
+                Me.SelLength = Len(Me.Value)
+                Me.CaretPosition = CaretPosition.CaretPositionEnd
+                Me.ControlContext.Repaint
+                
+            Case SpecialKeyCodes.Cut
+                [_HiddenModule].ClipboardSetTextInternal(GetCurrentSelectedText(), vbCFUnicodeText)
+                ReplaceSelectedText("")
+                
+            Case SpecialKeyCodes.Copy
+                [_HiddenModule].ClipboardSetTextInternal(GetCurrentSelectedText(), vbCFUnicodeText)
+                
+            Case SpecialKeyCodes.Paste
+                ReplaceSelectedText([_HiddenModule].ClipboardGetTextInternal(vbCFUnicodeText))
+                
+            Case Is >= 32
+                If EventInfo.ControlKeyDown = False Then
+                    ReplaceSelectedText(ChrW$(EventInfo.KeyCode))
+                End If
+            
+        End Select
+        
+     End Sub
+     
+     Private Sub OnMouseDown(EventInfo As MouseEvent)
+        If EventInfo.ShiftKeyDown Then
+            Debug.Print "OnMouseDown.TextPosition (SHIFT): " & EventInfo.TextPosition
+            If Me.IsDragging = False Then
+                Me.IsDragging = True
+                Me.StartDragX = Me.SelStart
+            End If
+            OnMouseMove(EventInfo)
+        Else
+            Debug.Print "OnMouseDown.TextPosition: " & EventInfo.TextPosition
+            Me.SelStart = EventInfo.TextPosition
+            Me.SelLength = 0
+            Me.IsDragging = True
+            Me.StartDragX = EventInfo.TextPosition
+            Me.ControlContext.Repaint
+        End If
+    End Sub
+    
+    Private Sub OnMouseMove(EventInfo As MouseEvent)
+        Debug.Print "OnMouseMove.TextPosition: " & EventInfo.TextPosition & " [" & EventInfo.PositionX & "," & EventInfo.PositionY & "]"
+        If Me.IsDragging AndAlso (EventInfo.TextPosition > 0) Then
+            Dim xDiff As Long = EventInfo.TextPosition - Me.StartDragX
+            Me.SelLength = CLng(Abs(xDiff))
+            If Sgn(xDiff) = -1 Then
+                Me.SelStart = Me.StartDragX + xDiff
+                Me.CaretPosition = CaretPosition.CaretPositionStart
+            Else
+                Me.SelStart = Me.StartDragX
+                Me.CaretPosition = CaretPosition.CaretPositionEnd
+            End If
+            Me.ControlContext.Repaint
+        End If
+    End Sub
+    
+    Private Sub OnMouseUp(EventInfo As MouseEvent)
+        Me.IsDragging = False
+    End Sub
+    
+    Private Sub OnGotFocus(ByRef EventInfo As FocusEvent)
+        Me.CaretPosition = Me.PreservedCaretPosition
+        If Me.CaretPosition = CaretPosition.CaretPositionNone Then
+            Me.CaretPosition = CaretPosition.CaretPositionEnd
+        End If
+        Me.IsFocused = True
+        If Me.SelStart = 0 Then Me.SelStart = 1
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnLostFocus(ByRef EventInfo As FocusEvent)
+        Me.PreservedCaretPosition = Me.CaretPosition
+        Me.CaretPosition = CaretPosition.CaretPositionNone
+        Me.IsFocused = False
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnMouseEnter(ByRef EventInfo As MouseEvent)
+        Debug.Print "WaynesTextBox Hover: " & EventInfo.PositionX & "," & EventInfo.PositionY
+        Me.IsHovering = True
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnMouseLeave(ByRef EventInfo As MouseEvent)
+        Debug.Print "WaynesTextBox Unhover: " & EventInfo.PositionX & "," & EventInfo.PositionY
+        Me.IsHovering = False
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnDblClick(ByRef EventInfo As MouseEvent)
+        Debug.Print "WaynesTextBox Double Clicked: " & EventInfo.PositionX & "," & EventInfo.PositionY & "[" & EventInfo.TextPosition & "]"
+
+        Dim wordRange As Range = GetWordRangeAtPosition(EventInfo.TextPosition)
+        Me.SelStart = wordRange.Start
+        Me.SelLength = wordRange.Length
+        Me.CaretPosition = CaretPosition.CaretPositionEnd
+        Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnInitialize(ByVal ControlContext As CustomControls.CustomControlContext) _
+            Implements ICustomControl.Initialize
+        If Not ControlContext.GetSerializer.RuntimeUISrzDeserialize(Me) Then
+            InitializeDefaultValues
+        End If
+        Set Me.ControlContext = ControlContext
+    End Sub
+
+    Private Sub OnDestroy() _
+        Implements ICustomControl.Destroy
+    End Sub
+    
+    Private Sub OnPaint(ByVal Canvas As CustomControls.Canvas) _
+        Implements ICustomControl.Paint
+        
+        Dim ActiveState As WaynesTextBoxState
+        
+        If Me.IsFocused Then
+            Set ActiveState = Me.FocusedState
+        ElseIf Me.IsHovering Then
+            Set ActiveState = Me.HoverState
+        Else
+            Set ActiveState = Me.NormalState
+        End If
+        
+        Dim descriptor As ElementDescriptor
+        With descriptor
+            .Left = 0
+            .Top = 0
+            .Width = Canvas.RuntimeUICCGetWidth()
+            .Height = Canvas.RuntimeUICCGetHeight()
+            Set .BackgroundFill = ActiveState.BackgroundFill
+            .Text = Me.Value
+            Set .TextRenderingOptions = ActiveState.TextRendering
+            Set .Corners = ActiveState.Corners
+            Set .Borders = ActiveState.Borders
+            .OnKeyDown = AddressOf OnKeyDown
+            .OnKeyPress = AddressOf OnKeyPress
+            .OnMouseDown = AddressOf OnMouseDown
+            .OnMouseMove = AddressOf OnMouseMove
+            .OnMouseUp = AddressOf OnMouseUp
+            .OnGotFocus = AddressOf OnGotFocus
+            .OnLostFocus = AddressOf OnLostFocus
+            .OnMouseEnter = AddressOf OnMouseEnter
+            .OnMouseLeave = AddressOf OnMouseLeave
+            .OnDblClick = AddressOf OnDblClick
+            .Cursor = MousePointerConstants.vbIbeam
+            .CaretPosition = Me.CaretPosition
+            .ElementTabStop = True
+            
+            ' Selected text highlighting, and drawing the caret position are done via text decorations
+            ' In this example control, we also add automatic text decorations for text entered of 'ERROR', 'WARNING' and 'INFO'
+            Set .TextDecorators = New TextDecorators
+            .TextDecorators.AddBackgroundFill(Me.SelStart, Me.SelLength, ActiveState.SelectedBackgroundFill)
+
+            ' Add some text decorators, based on the input value
+            Dim startPos As Long
+            Do
+                startPos += 1
+                startPos = InStr$(startPos, Me.Value, "ERROR")
+                If startPos <> 0 Then
+                    .TextDecorators.AddSquiggle(startPos, 5, NormalState.DecorationERROR)
+                End If
+            Loop While startPos <> 0
+            
+            startPos = 0
+            Do
+                startPos += 1
+                startPos = InStr$(startPos, Me.Value, "WARNING")
+                If startPos <> 0 Then
+                    .TextDecorators.AddUnderline(startPos, 7, NormalState.DecorationWARNING, 2)
+                End If
+            Loop While startPos <> 0
+            
+            startPos = 0
+            Do
+                startPos += 1
+                startPos = InStr$(startPos, Me.Value, "INFO")
+                If startPos <> 0 Then
+                    .TextDecorators.AddBackgroundFill(startPos, 4, NormalState.DecorationINFO)
+                End If
+            Loop While startPos <> 0
+            
+            .TextDecorators.ChangeTextFill(Me.SelStart, Me.SelLength, ActiveState.SelectedTextFill)
+            .TextDecorators.AddCaret(GetCaretPosition(), If(Me.SelLength > 0, ActiveState.CaretFill, NormalState.CaretFill), ActiveState.CaretWidth)
+            
+            Canvas.RuntimeUICCCanvasAddElement(descriptor)
+        End With
+                
+    End Sub
+                
+End Class

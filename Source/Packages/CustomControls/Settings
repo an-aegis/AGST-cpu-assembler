@@ -1,0 +1,45 @@
+{
+	"configuration.inherits": "Defaults",
+	"project.appTitle": "CustomControls DESIGNER Package",
+	"project.autoPrettify": true,
+	"project.buildPath": "${SourcePath}\\Build\\${ProjectName}_${Architecture}.${FileExtension}",
+	"project.buildType": "Package TWINPACK",
+	"project.debuggable": false,
+	"project.description": "twinBASIC - CustomControls DESIGNER Package",
+	"project.exportPathIsV2": true,
+	"project.id": "{EA18E2B1-80BA-478D-AC7C-E955E6AA1B05}",
+	"project.licence": "MIT",
+	"project.name": "CustomControls",
+	"project.optionExplicit": true,
+	"project.packageVisibility": "PUBLIC",
+	"project.references": [
+		{
+			"id": "{00020430-0000-0000-C000-000000000046}",
+			"lcid": 0,
+			"name": "OLE Automation",
+			"path32": "C:\\Windows\\SysWow64\\stdole2.tlb",
+			"path64": "C:\\Windows\\System32\\stdole2.tlb",
+			"symbolId": "stdole",
+			"versionMajor": 2,
+			"versionMinor": 0
+		}
+	],
+	"project.settingsVersion": 1,
+	"project.versionBuild": 0,
+	"project.versionMajor": 0,
+	"project.versionMinor": 0,
+	"project.versionRevision": 24,
+	"project.warnings": {
+		"errors": [
+			"TB0018",
+			"TB0019",
+			"TB0020",
+			"TB0024"
+		],
+		"hints": [],
+		"ignored": [],
+		"info": [],
+		"warnings": []
+	},
+	"runtime.useUnicodeStandardLibrary": true
+}

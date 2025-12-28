@@ -1,0 +1,119 @@
+[Description("")]
+[FormDesignerId("DC20C6FD-C64A-4D27-9DDF-07FC94F26E14")]
+[PredeclaredId]
+Class Form1
+    Option Base 1
+    
+    Dim FileName$
+    
+    Sub Form_Load()
+        Dim i%, lines$
+        For i = 1 To 100
+            lines = lines & If(i < 10, "  ", If(i < 100, " ", "")) & CStr(i) & "  hjgadf g hdfjas jhsadg fj" & vbCrLf
+        Next
+        txtSource.Text = lines
+        lines = ""
+        For i = 1 To 100
+            lines = lines & If(i < 10, "  ", If(i < 100, " ", "")) & CStr(i) & "  012345" & vbCrLf
+        Next
+        txtMachineCode.Text = lines
+    End Sub
+    
+    Private	Sub Save()
+        If FileName	= "" Then
+            SaveAs
+        Else
+            Open FileName For Output As 1
+            Print #1, txtSource.Text ; ' will dump data into file #1
+            Close 1
+        End If
+    End Sub
+    
+    Private Sub SaveAs()
+        Dim Dialog As New CommonDialog
+        Dialog.Filter = "*.ass" ' only ass allowed here
+        If Dialog.ShowSave() Then
+            FileName = Dialog.FileName ' collect the selected file name
+            Save ' will actually save because we just filled out FileName
+        End If
+    End Sub
+    
+    Private Sub Load()
+        Dim Dialog As New CommonDialog
+        Dialog.Filter = "*.ass" ' only ass allowed here
+        If Dialog.ShowSave() Then
+            Dim Contents$, line$
+            FileName = Dialog.FileName ' collect the selected file name
+            Open FileName For Input As 1
+            While Not EOF(1)
+                Line Input #1, line
+                Contents = Contents & line & vbCrLf
+            Wend
+            Close 1
+            txtSource.Text = Contents
+        End If
+    End Sub
+    
+    Private Sub mnuSave_Click()
+        Save
+    End Sub
+    
+    Private Sub mnuSaveAs_Click()
+        SaveAs
+    End Sub
+    
+    Private Sub mnuLoad_Click()
+        Load
+    End Sub
+    
+    Private Sub txtMachineCode_Scroll()
+        Dim pos As Any = GetScrollPos(txtMachineCode.hWnd, SB_VERT)
+        lblPos.Caption = CStr(pos)
+        ScrollTextBox(txtSource, pos, 0)
+    End Sub
+    
+    Private Function ScrollTextBox1(ByVal TxtBox As TextBox, ByVal vLines As Integer, ByVal hCols As Integer) As LongLong
+        Return SetScrollPos(TxtBox.hWnd, SB_VERT, vLines, 1)
+    End Function
+    
+    Private Function ScrollTextBox(ByVal TxtBox As TextBox, ByVal vLines As Integer, ByVal hCols As Integer) As Long
+        Dim si As SCROLLINFO, pos As Long
+        Dim prevCtl As Control = ActiveControl
+    
+        TxtBox.SetFocus
+
+        
+        Dim line As Any = SendMessage(TxtBox.hWnd, EM_LINEINDEX, vLines, ByVal 0)
+        'Debug.Print line
+        
+        SendMessage(TxtBox.hWnd, EM_SETSEL, pos, pos)
+        
+        si.cbSize = LenB(si)
+        si.fMask = SIF_POS
+        si.nPos = vLines
+        pos = SetScrollInfo(txtSource.hWnd, SB_VERT, si, 1)
+        
+        prevCtl.SetFocus
+        Return pos
+    End Function
+    
+    Private Function ScrollTextBox0(ByVal TxtBox As TextBox, ByVal vLines As Integer, ByVal hCols As Integer) As LongLong
+        Dim Success As LongLong
+        Dim lParamVal As LongLong
+        
+        ' Combine vertical lines (low-order 2 bytes) and horizontal columns (high-order 2 bytes)
+        ' A positive vLines scrolls upward, a negative value scrolls downward
+        ' A positive hCols scrolls left, a negative value scrolls right
+        lParamVal = MAKEDWORD(vLines, hCols)
+        
+        ' Send the EM_LINESCROLL message to the TextBox's window handle
+        Success = SendMessage(TxtBox.hWnd, EM_LINESCROLL, 0, ByVal lParamVal)
+        
+        Return Success
+    End Function
+    
+    Private Sub btnScroll_Click()
+        ScrollTextBox(txtSource, 50, 0)
+    End Sub
+    
+End Class

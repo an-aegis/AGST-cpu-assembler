@@ -1,0 +1,217 @@
+Module Constants
+	Enum ColorRGBA      ' FIXME Substitute for an ALIAS to Long
+        [_MAX] = 0
+    End Enum
+    Enum PixelCount      ' FIXME Substitute for an ALIAS to Long
+        [_MAX] = 0
+    End Enum
+    Enum PointSize      ' FIXME Substitute for an ALIAS to Long
+        [_MAX] = 0
+    End Enum
+     
+    Public Enum CornerShape
+        tbCurve = 0
+        tbNotched = 1
+        tbCutOut = 2
+    End Enum
+
+    Public Enum FillPattern
+        tbPatternNone = 0
+        tbGradientNorthToSouth = 1
+        tbGradientSouthToNorth = 2
+        tbGradientWestToEast = 3
+        tbGradientEastToWest = 4
+        tbGradientNorthWestToSouthEast = 5
+        tbGradientNorthWestToSouthEastAlt = 6
+        tbGradientNorthEastToSouthWest = 7
+        tbGradientNorthEastToSouthWestAlt = 8
+        tbGradientSouthWestToNorthEast = 9
+        tbGradientSouthWestToNorthEastAlt = 10
+        tbGradientSouthEastToNorthWest = 11
+        tbGradientSouthEastToNorthWestAlt = 12
+        tbGradientCornerTopLeft = 13
+        tbGradientCornerTopRight = 14
+        tbGradientCornerBottomLeft = 15
+        tbGradientCornerBottomRight = 16
+        tbGradientCornerTopLeftAlt = 17
+        tbGradientCornerTopRightAlt = 18
+        tbGradientCornerBottomLeftAlt = 19
+        tbGradientCornerBottomRightAlt = 20
+    End Enum
+
+    Public Enum TextAlignment
+        tbAlignTopLeft = 0
+        tbAlignTopCenter = 1
+        tbAlignTopRight = 2
+        tbAlignMiddleLeft = 3
+        tbAlignMiddleCenter = 4
+        tbAlignMiddleRight = 5
+        tbAlignBottomLeft = 6
+        tbAlignBottomCenter = 7
+        tbAlignBottomRight = 8
+    End Enum
+
+    Public Enum TextOverflowMode
+        tbAllowPartialChars = 0
+        tbDisallowPartialChars = 1
+        tbAppendEllipsis = 2
+        tbShrinkToFit = 3
+    End Enum
+
+    Public Enum DockMode
+        tbDockNone = 0
+        tbDockLeft = 1
+        tbDockTop = 2
+        tbDockRight = 3
+        tbDockBottom = 4
+        tbDockFill = 5
+    End Enum
+
+    Public Enum FontWeight
+        tbThin = 100
+        tbExtraLight = 200
+        tbLight = 300
+        tbNormal = 400
+        tbMedium = 500
+        tbSemiBold = 600
+        tbBold = 700
+        tbExtraBold = 800
+        tbHeavy = 900
+    End Enum
+
+    Public Enum StartupPosition
+        tbStartUpManual = 0
+        tbStartUpCenterOwner = 1
+        tbStartUpCenterScreen = 2
+        tbStartUpWindowsDefault = 3
+    End Enum
+
+    Public Enum Customtate
+        tbNormal = 0
+        tbMinimized = 1
+        tbMaximized = 2
+    End Enum
+
+    Public Enum BorderStyle
+        tbNone = 0
+        tbFixedSingle = 1
+        tbFixedSizable = 2
+        tbFixedDialog = 3
+        tbFixedToolWindow = 4
+        tbSizableToolWindow = 5
+    End Enum
+    
+    Public Enum WindowState
+        tbNormal = 0
+        tbMinimized = 1
+        tbMaximized = 2
+    End Enum
+    
+    Type SerializeInfo
+        Pointer As LongPtr
+
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(False), SimplerByVals(True)]                     ' NOTE: PreserveSig(FALSE) here
+        Public DeclareWide PtrSafe Function RuntimeUISrzDeserialize Lib "<runtimeuisrz>" Alias "#1" (ByVal Me As SerializeInfo, ByVal object As stdole.IUnknown) As Boolean
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(True), SimplerByVals(True)]
+        Public DeclareWide PtrSafe Function RuntimeUISrzGetRootCLSID Lib "<runtimeuisrz>" Alias "#2" (ByVal Me As SerializeInfo) As String
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(True), SimplerByVals(True)]
+        Public DeclareWide PtrSafe Function RuntimeUISrzGetRootClassDispatch Lib "<runtimeuisrz>" Alias "#3" (ByVal Me As SerializeInfo) As Object
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(True), SimplerByVals(True)]
+        Public DeclareWide PtrSafe Function RuntimeUISrzIsDesignMode Lib "<runtimeuisrz>" Alias "#4" (ByVal Me As SerializeInfo) As Boolean
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(True), SimplerByVals(True)]
+        Public DeclareWide PtrSafe Function RuntimeUISrzGetFormHWND Lib "<runtimeuisrz>" Alias "#5" (ByVal Me As SerializeInfo) As LongPtr
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(True), SimplerByVals(True)]
+        Public DeclareWide PtrSafe Function RuntimeUISrzIsReportMode Lib "<runtimeuisrz>" Alias "#6" (ByVal Me As SerializeInfo) As Boolean
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(True), SimplerByVals(True)]
+        Public DeclareWide PtrSafe Function RuntimeUISrzIsRuntimeAdded Lib "<runtimeuisrz>" Alias "#7" (ByVal Me As SerializeInfo) As Boolean
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(True), SimplerByVals(True)]
+        Public DeclareWide PtrSafe Function RuntimeUISrzGetOrientationHint Lib "<runtimeuisrz>" Alias "#8" (ByVal Me As SerializeInfo) As Long
+    End Type
+    
+    Type Canvas
+        Pointer As LongPtr
+      
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(False), SimplerByVals(True)]         ' NOTE: PreserveSig(FALSE) here
+        Public DeclareWide PtrSafe Sub RuntimeUICCCanvasAddElement Lib "<runtimeuicanvas>" Alias "#1" (ByVal Me As Canvas, ByRef ElementDescriptor As Any)
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(False), SimplerByVals(True)]         ' NOTE: PreserveSig(FALSE) here
+        Public DeclareWide PtrSafe Function RuntimeUICCGetDpiScaleFactor Lib "<runtimeuicanvas>" Alias "#2" (ByVal Me As Canvas) As Double
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(False), SimplerByVals(True)]         ' NOTE: PreserveSig(FALSE) here
+        Public DeclareWide PtrSafe Function RuntimeUICCGetDpi Lib "<runtimeuicanvas>" Alias "#3" (ByVal Me As Canvas) As Long
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(False), SimplerByVals(True)]         ' NOTE: PreserveSig(FALSE) here
+        Public DeclareWide PtrSafe Function RuntimeUICCGetWidth Lib "<runtimeuicanvas>" Alias "#4" (ByVal Me As Canvas) As Long
+        [DLLStackCheck(False), UseGetLastError(False), PreserveSig(False), SimplerByVals(True)]         ' NOTE: PreserveSig(FALSE) here
+        Public DeclareWide PtrSafe Function RuntimeUICCGetHeight Lib "<runtimeuicanvas>" Alias "#5" (ByVal Me As Canvas) As Long
+    End Type
+    
+End Module
+
+[InterfaceId("047A75BA-1102-4DA2-92B0-230991730999")]
+Interface _CustomControlTimer Extends stdole.IUnknown
+    Property Get Interval() As Long
+    Property Let Interval(ByVal Value As Long)
+    Property Get Enabled() As Boolean
+    Property Let Enabled(ByVal Value As Boolean)
+End Interface
+
+[InterfaceId("E849E0ED-B599-46AD-A13E-340DB7A9F1DD")]
+Interface _CustomControlTimerEvents Extends stdole.IUnknown
+	Sub OnTimer()
+End Interface
+
+[CoClassId("E7F3D923-475B-4367-B5EF-568FCF3A74B5")]
+CoClass CustomControlTimer
+    [Default] Interface _CustomControlTimer
+    [Default, Source] Interface _CustomControlTimerEvents
+End CoClass
+
+[InterfaceId("A40CD6C4-A612-4965-ACB0-D5A4D74D4230")]
+Interface _CustomControlContext Extends stdole.IUnknown
+    Function GetSerializer() As SerializeInfo
+    Sub Repaint()
+    Function CreateTimer() As stdole.IUnknown
+    Sub ChangeFocusedElement(ByVal ElementTabIndex As Long)
+End Interface
+
+[CoClassId("746CF7F0-22A1-4237-A790-A50869615B0D")]
+CoClass CustomControlContext
+    [Default] Interface _CustomControlContext
+End CoClass
+
+[InterfaceId("FA16E0F6-CE83-4A6B-A016-0904A982B91F")]
+Interface _CustomFormContext Extends _CustomControlContext
+    Sub Show()
+    Sub Close()
+End Interface
+
+[CoClassId("8428F473-603D-4416-9911-BAEB8058FC14")]
+CoClass CustomFormContext
+    [Default] Interface _CustomFormContext
+End CoClass
+
+[InterfaceId("90B3C34E-B89C-4CA5-8678-77441E4B0F83")]
+Interface ICustomControl Extends stdole.IUnknown
+	Sub Initialize(ByVal Context As CustomControlContext)
+    Sub Destroy()
+    Sub Paint(ByVal Canvas As Canvas)
+End Interface
+
+[InterfaceId("FDE806AA-F365-4F4B-BF25-10672EA56391")]
+Interface _CustomControlsCollection
+    [DispId(1)] Property Get Count() As Long
+    [DispId(0)] Property Get Item(ByRef IndexOrName As Variant) As Object
+    [DispId(2)] Function Add(ByVal ProgId As String, ByVal ControlName As String, ByVal Container As Object) As Object
+    [DispId(3)] Sub Remove(ByRef IndexOrName As Variant)
+    [DispId(-4), Hidden] Function _NewEnum() As stdole.IUnknown
+End Interface
+
+[CoClassId("5A5B8745-E5CB-4B85-AB2F-B4FAF7B747D0")]
+CoClass CustomControlsCollection
+    [Default] Interface _CustomControlsCollection
+End CoClass
+
+[InterfaceId("52335998-8814-48E1-9D0E-4B1DA6B5C00A")]
+Interface ICustomForm Extends stdole.IUnknown
+    Sub Initialize(ByVal Context As CustomFormContext)
+    Sub Destroy()
+    Sub Paint(ByVal Canvas As Canvas)
+End Interface

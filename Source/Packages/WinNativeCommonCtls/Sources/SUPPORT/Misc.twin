@@ -1,0 +1,49 @@
+Private Module Miscellaneous
+            
+    Private globalEmptyString As String ' = ""   FIXME not working in compiled builds
+    Public Function StrPtrSafe(ByRef s As String) As LongPtr
+    	Dim retVal As LongPtr = StrPtr(s)
+        If retVal = 0 Then retVal = StrPtr(globalEmptyString)
+        If retVal = 0 Then
+        	globalEmptyString = ""
+            retVal = StrPtr(globalEmptyString)
+        End If
+        Return retVal
+    End Function
+    
+    #If FEATURE_TREEVIEW Then
+    Public Function CommonTreeViewGetNodeFromHandle(ByRef tv As TreeViewBaseCtl, ByVal Handle As LongPtr) As Node
+        Return CType(Of TbTreeViewPrivate)(tv).GetNodeFromHandle(Handle)
+    End Function
+    #End If
+    
+    Public Enum OrientationConstants
+        ccOrientationHorizontal = 0
+        ccOrientationVertical = 1
+    End Enum
+    
+    Public Sub SyncBorderStyle(objControl As Control)
+    	
+        Dim ctlHwnd As VB.HWND = CLngPtr(objControl.hwnd)
+        Dim styles As Long = ctlHwnd.GetWindowLongW(VB.GWL_STYLE)
+        Dim exStyles As Long = ctlHwnd.GetWindowLongW(VB.GWL_EXSTYLE)
+        
+        styles = styles And Not VB.WS_BORDER
+        exStyles = exStyles And Not VB.WS_EX_CLIENTEDGE
+        
+        If objControl.BorderStyle = ControlBorderStyleConstants.vbFixedSingleBorder Then
+            If objControl.Appearance = AppearanceConstants.vbAppear3d Then
+                exStyles += VB.WS_EX_CLIENTEDGE
+            Else
+                styles += VB.WS_BORDER
+            End If
+        End If
+        
+        ctlHwnd.SetWindowLongW(VB.GWL_STYLE, styles)
+        ctlHwnd.SetWindowLongW(VB.GWL_EXSTYLE, exStyles)
+        
+        'this is needed to ensure windows cached stuff is updated after changing GWL_STYLE
+        ctlHwnd.SetWindowPos(0&, 0, 0, 0, 0, VB.SWP_NOSIZE Or VB.SWP_NOMOVE Or VB.SWP_NOZORDER Or VB.SWP_FRAMECHANGED Or VB.SWP_NOACTIVATE)
+    End Sub
+    
+End Module

@@ -1,0 +1,54 @@
+[CustomControl("/miscellaneous/frmLabel.png")]
+[ClassId("6C9EBA9F-C7D3-479A-9604-BB81AEF3C6E9")]
+[COMCreatable(False)]
+Class WaynesLabel
+    
+    Implements CustomControls.ICustomControl
+    Implements BaseControl Via _BaseControl = New BaseControl
+     
+    [Description("Controls the fill colors and pattern used to draw the background of the label")]
+    Public WithEvents BackgroundFill As Fill = New Fill
+    [Description("Controls how the Value text is rendered")]
+    Public WithEvents TextRendering As TextRendering = New TextRendering
+    [Description("Adjusts the text displayed on this label")]
+    Public Caption As String = "Label"
+    
+    Private Sub OnChanged() Handles _BaseControl.OnChanged, _
+                                    BackgroundFill.OnChanged, _
+                                    BackgroundFill.OnPropertySet, _
+                                    TextRendering.OnChanged, _
+                                    TextRendering.OnPropertySet, _
+                                    Caption.OnPropertyLet
+        If Me.ControlContext IsNot Nothing Then Me.ControlContext.Repaint
+    End Sub
+    
+    Private Sub OnInitialize(ByVal ControlContext As CustomControls.CustomControlContext) _
+            Implements ICustomControl.Initialize
+        If Not ControlContext.GetSerializer.RuntimeUISrzDeserialize(Me) Then
+            'InitializeDefaultValues
+        End If
+        Set Me.ControlContext = ControlContext
+    End Sub
+
+    Private Sub OnDestroy() _
+        Implements ICustomControl.Destroy
+    End Sub
+    
+    Private Sub OnPaint(ByVal Canvas As CustomControls.Canvas) _
+        Implements ICustomControl.Paint
+        
+        Dim descriptor As ElementDescriptor
+        With descriptor
+            .Left = 0
+            .Top = 0
+            .Width = Canvas.RuntimeUICCGetWidth()
+            .Height = Canvas.RuntimeUICCGetHeight()
+            Set .BackgroundFill = Me.BackgroundFill
+            .Text = Me.Caption
+            Set .TextRenderingOptions = Me.TextRendering
+            Canvas.RuntimeUICCCanvasAddElement(descriptor)
+        End With
+                
+    End Sub
+    
+End Class

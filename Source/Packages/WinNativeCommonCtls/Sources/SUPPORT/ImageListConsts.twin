@@ -1,0 +1,56 @@
+Private Module ImageListConsts
+
+    Public Const HDSIL_NORMAL As Long = 0
+    Public Const HDM_SETIMAGELIST As Long = (&H1200 + 8)
+    
+    Public Const ILD_NORMAL As Long = &H0
+    Public Const ILD_TRANSPARENT As Long = &H1
+    Public Const ILD_FOCUS As Long = &H2
+    Public Const ILD_SELECTED As Long = &H4
+    Public Const ILD_MASK As Long = &H10
+    Public Const ILD_IMAGE As Long = &H20
+    Public Const ILD_ROP As Long = &H40
+    Public Const ILD_OVERLAYMASK As Long = &HF00
+    Public Const ILC_MASK As Long = &H1
+    Public Const ILC_MIRROR As Long = &H2000
+    Public Const ILCF_MOVE As Long = &H0
+    Public Const ILCF_SWAP As Long = &H1
+    Public Const ILC_COLOR4 As Long = &H4
+    Public Const ILC_COLOR8 As Long = &H8
+    Public Const ILC_COLOR16 As Long = &H10
+    Public Const ILC_COLOR24 As Long = &H18
+    Public Const ILC_COLOR32 As Long = &H20
+
+    Public Enum ImlDrawConstants
+        ImlDrawNormal = 1
+        ImlDrawTransparent = 2
+        ImlDrawSelected = 4
+        ImlDrawFocus = 8
+        ImlDrawNoMask = 16
+    End Enum
+    
+    #If FEATURE_IMAGELIST Then
+    Public Sub CommonVerifyImage(IndexOrKey As Variant, ImageList As ImageListBaseCtl)
+        If IsMissing(IndexOrKey) = False Then
+            If ImageList Is Nothing Then
+                Err.Raise 35613, , "ImageList must be initialized before it can be used"
+            End If
+        End If
+        
+        If IsMissing(IndexOrKey) = False Then
+            If VarType(IndexOrKey) = vbString Then
+                If ImageList.ListImages.Exists(IndexOrKey) = False Then
+                    Err.Raise 35601, , "Element not found"
+                End If
+            ElseIf IsNumeric(IndexOrKey) Then
+                If (IndexOrKey < 0) Or (IndexOrKey > ImageList.ListImages.Count) Then
+                    Err.Raise 35600, , "Index out of bounds"
+                End If
+            Else
+                Err.Raise 35603, , "Invalid key"
+            End If
+        End If
+    End Sub
+    #End If
+    
+End Module

@@ -1,0 +1,1135 @@
+#If FEATURE_MONTHVIEW Then
+[ClassId("341DB59F-0142-431B-BBB4-4D4F07502198")]
+[InterfaceId("F4DCEFE0-A080-4D8C-93B3-BCB2DC003E53")]
+[COMCreatable(False)]
+[EventsUseDispInterface]
+Class MonthViewBaseCtl
+	
+	#Region "INHERITANCE"
+ 
+        Inherits VB.BaseControlFocusable
+        
+        [WithDispatchForwarding] Implements Control
+        Implements VB.IWindowsControl
+        Implements VB.IWindowElementEventsCommon
+        Implements VB.IWindowElementEventsCommonControls
+        Implements VB.IWindowElementEventsUC
+        Implements VB.IWindowElementEventsAX
+        
+    #End Region
+            
+    #Region "STATE"
+        #If FEATURE_OLEDRAGDROP Then
+        [CustomDesigner("designer_RestrictedOLEDropMode")]
+            Public OLEDropMode As VBRUN.OLEDropConstants
+        Protected OLEDragDropHandler As VB.OLEDragDropHandler
+        #End If
+        
+        Public ShowToday As Boolean = True
+        Public ShowTodayCircle As Boolean = True
+        Public ShowWeekNumbers As Boolean = False
+        Public ShowTrailingDates As Boolean = True
+                    
+        Public MonthColumns As Long = 1
+        Public MonthRows As Long = 1
+        Public ResizeToFit As Boolean = True
+        
+        [Description("")]
+            Public BorderStyle As VBRUN.ControlBorderStyleConstants = ControlBorderStyleConstants.vbFixedSingleBorder
+        [Description("")]
+            Public Appearance As VBRUN.AppearanceConstants = VBRUN.AppearanceConstants.vbAppear3d
+
+        [Serialize(True, "MinDate")]
+            Protected MinDate_INIT As Date = DateSerial(1753, 1, 1)
+        [Serialize(True, "MaxDate")]
+            Protected MaxDate_INIT As Date = DateSerial(9999, 12, 31)
+
+        [Description("Opacity, given as a percentage, 0 - 100.  REQUIRES TARGET OS 6.2+ FOR CHILD CONTROLS.")]
+            Public Opacity As Double = 100
+        
+        [CustomDesigner("designer_SpectrumWindowsOrClear")]
+        [Description("A color, when set, that will appear fully transparent in the window.  REQUIRES TARGET OS 6.2+ FOR CHILD CONTROLS.")]
+            Public TransparencyKey As OLE_COLOR = -1
+        
+        [CustomDesigner("designer_SpectrumWindows")]
+        [Serialize(True, "BackColor")]
+        Protected BackColor_INIT As OLE_COLOR = vbWindowBackground
+
+        [CustomDesigner("designer_SpectrumWindows")]
+        [Serialize(True, "MonthBackColor")]
+        Protected MonthBackColor_INIT As OLE_COLOR = vbWindowBackground
+        
+        [CustomDesigner("designer_SpectrumWindows")]
+        [Serialize(True, "TitleBackColor")]
+        Protected TitleBackColor_INIT As OLE_COLOR = vbActiveTitleBar
+        
+        [CustomDesigner("designer_SpectrumWindows")]
+        [Serialize(True, "TitleForeColor")]
+        Protected TitleForeColor_INIT As OLE_COLOR = vbActiveTitleBarText
+        
+        [CustomDesigner("designer_SpectrumWindows")]
+        [Serialize(True, "TrailingForeColor")]
+        Protected TrailingForeColor_INIT As OLE_COLOR = vbGrayText
+        
+        [CustomDesigner("designer_SpectrumWindows")]
+        [Serialize(True, "ForeColor")]
+        Protected ForeColor_INIT As OLE_COLOR = vbButtonText
+        
+        [Serialize(True, "Value")]
+        Protected Value_INIT As Date = Date()
+        
+        Public MultiSelect As Boolean = False
+        Public MaxSelCount As Long = 7
+        Public ScrollRate As Long = 0
+        Public StartOfWeek As VbDayOfWeek
+                        
+        Type MonthViewInternalData
+            IsInitialized As Boolean
+            IsNewControl As Boolean
+            LastSelectionStart As Variant
+            LastSelectionEnd As Variant
+            
+            IsDesignMode As Boolean
+            LastMouseUpX As Single
+            LastMouseUpY As Single
+            LastMouseUpTime As LongLong
+            
+            LastCachedDayStateStart As Date
+            LastCachedDayStateEnd As Date
+            LastCachedDayStateMonthCount As Long
+            LastCachedDayStateNumDays As Long
+            LastCachedDayStateDayStates() As Boolean
+            LastCachedDayStateBits() As Long
+        End Type
+        Protected MonthViewData As MonthViewInternalData
+    
+        Protected Sub ResetInternalMonthViewData()
+            Erase MonthViewData.LastCachedDayStateDayStates
+            Erase MonthViewData.LastCachedDayStateBits
+            [_HiddenModule].MemZero(VarPtr(MonthViewData), LenB(Of MonthViewInternalData))
+            MonthViewData.LastMouseUpX = -1
+            MonthViewData.LastMouseUpY = -1
+        End Sub
+        
+            [Unimplemented]
+            Public RightToLeft As Boolean = False
+
+            Public HelpContextID As Long
+            Public WhatsThisHelpID As Long
+
+    #End Region
+
+    #Region "EVENTS"
+    
+        [Description("")]
+            Public Event Click()
+        [DefaultDesignerEvent]
+        [Description("")]
+            Public Event DateClick(ByVal DateClicked As Date)
+        [Description("")]
+            Public Event DblClick()
+        [Description("")]
+            Public Event DateDblClick(ByVal DateDblClicked As Date)
+        [Description("")]
+            Public Event GetDayBold(ByVal StartDate As Date, ByVal Count As Integer, ByRef State() As Boolean)
+        [Description("")]
+            Public Event SelChange(ByVal StartDate As Date, ByVal EndDate As Date, Cancel As Boolean)
+        [Description("")]
+            Event GotFocus()
+        [Description("")]
+            Event LostFocus()
+        [Description("This event fires when the user presses a key")]
+            Event KeyDown(KeyCode As Integer, ByVal Shift As Integer)
+        [Description("This event fires when the user presses a key")]
+            Event KeyPress(KeyAscii As Integer)
+        [Description("This event fires when the user releases a key")]
+            Event KeyUp(KeyCode As Integer, ByVal Shift As Integer)
+        [Description("")]
+            Event MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
+        [Description("")]
+            Event MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+        [Description("")]
+            Event MouseUp(Button As Integer, Shift As Integer, X As Single, Y As Single)
+        [Description("")]
+            Event Initialize()
+        [Description("")]
+            Event DragDrop(Source As Control, X As Single, Y As Single)
+        [Description("")]
+            Event DragOver(Source As Control, X As Single, Y As Single, State As Integer)
+        [Description("")]
+            Event OLECompleteDrag(Effect As Long)
+        [Description("")]
+            Event OLEDragDrop(Data As DataObject, Effect As Long, Button As Integer, Shift As Integer, X As Single, Y As Single)
+        [Description("")]
+            Event OLEDragOver(Data As DataObject, Effect As Long, Button As Integer, Shift As Integer, X As Single, Y As Single, State As Integer)
+        [Description("")]
+            Event OLEGiveFeedback(Effect As Long, DefaultCursors As Boolean)
+        [Description("")]
+            Event OLESetData(Data As DataObject, DataFormat As Integer)
+        [Description("")]
+            Event OLEStartDrag(Data As DataObject, AllowedEffects As Long)
+        Event Validate(Cancel As Boolean)
+        
+    #End Region
+               
+    #Region "MEMBERS"
+        Sub New()
+            BaseControlFocusable.New(ControlTypeConstants.vbMonthView)
+        End Sub
+    
+        Protected Function GetSystemDayOfWeek() As VbDayOfWeek
+            Return CType(Of VbDayOfWeek)(((7 - (Weekday(#02-Jan-2000#, vbUseSystemDayOfWeek) - 1)) Mod 7) + 1)
+        End Function
+        
+        Protected Sub HandleLoad() _
+                Implements VB.IWindowElementEventsCommon.Load
+            
+            Dim Opacity As Any = Me.Opacity
+            If ((Opacity >= 0) And (Opacity < 100)) Or (TransparencyKey <> -1) Then
+                SyncOpacity
+            End If
+        End Sub
+        
+        Protected Sub SyncOpacity() _ 
+                Handles Opacity.OnPropertyLet, _
+                        TransparencyKey.OnPropertyLet
+            
+            RootWindowElementBase.RuntimeUIGetHandle().CommonSyncOpacity(Me.TransparencyKey, Me.Opacity)
+        End Sub
+        
+        Protected Sub HandleInitialize(ByVal ControlContext As VB.ControlContext) _
+                Implements VB.IWindowsControl.Initialize
+      
+            Me.InternalStateReset()     ' resets all the base class state
+            Me.ResetInternalMonthViewData()
+            
+            Dim SerializeInfo As Any = ControlContext.RuntimeUICtxGetSerializer()
+
+            If Not SerializeInfo.RuntimeUISrzDeserialize(Me) Then
+                MonthViewData.IsNewControl = True
+                StartOfWeek = GetSystemDayOfWeek()
+            End If
+            MonthViewData.IsDesignMode = SerializeInfo.RuntimeUISrzIsDesignMode()
+            
+            Dim Opacity As Any = Me.Opacity
+            If Opacity > 100 Then Me.Opacity = 100
+            If Opacity < 0 Then Me.Opacity = 0
+                
+            Dim InitData As VB.WindowCreationData
+            InitData.WindowAtomIdx = CInt(VB.EnumWindowAtoms.AtomIdx_ThunderMonthView)
+            InitData.WindowStyles = GetStyles()
+            InitData.ExtendedStyles = GetExtendedStyles()
+            InitData.SubClass = True
+            CreateRootWindowElement(ControlContext, InitData)
+            RootWindowElementBase.RuntimeUISetAndSinkEvents(Me)
+        End Sub
+        
+        Protected Function GetStyles() As Long
+            Dim Styles As Long
+        	Styles += If(ShowToday, 0&, MCS_NOTODAY)
+        	Styles += If(ShowTodayCircle, 0&, MCS_NOTODAYCIRCLE)
+            Styles += If(ShowWeekNumbers, MCS_WEEKNUMBERS, 0&)
+            Styles += If(ShowTrailingDates, 0&, MCS_NOTRAILINGDATES)
+            Styles += If(MultiSelect, MCS_MULTISELECT, 0&)
+            Styles += If(MonthViewData.IsDesignMode = False, MCS_DAYSTATE, 0&)
+            
+            If Me.BorderStyle = ControlBorderStyleConstants.vbFixedSingleBorder Then
+                If Me.Appearance <> AppearanceConstants.vbAppear3d Then
+                    Styles += VB.WS_BORDER
+                End If
+            End If
+            Return Styles
+        End Function
+        
+        Protected Function GetExtendedStyles() As Long
+            Dim Styles As Long
+        	If Me.BorderStyle = ControlBorderStyleConstants.vbFixedSingleBorder Then
+                If Me.Appearance = AppearanceConstants.vbAppear3d Then
+                    Styles += VB.WS_EX_CLIENTEDGE
+                End If
+            End If
+            Return Styles
+        End Function
+                
+        Protected Sub HandleDestroy() _
+                Implements VB.IWindowsControl.Destroy
+            #If LOG_TERMINATE Then
+                Debug.Print CurrentComponentName & "." & CurrentProcedureName
+            #End If
+            
+            ' disconnect anything that causes a circular reference here
+            #If FEATURE_OLEDRAGDROP Then
+            If OLEDragDropHandler IsNot Nothing Then OLEDragDropHandler.Disconnect()
+            #End If
+            Set Me.Font = Nothing
+
+            [_HiddenModule].ResetFirstMethodAccessFlag([_HiddenModule].GetInheritedOwner(Me))
+        End Sub
+
+        #If LOG_TERMINATE Then
+            Protected Sub Class_Terminate()
+                Debug.Print CurrentComponentName & "." & CurrentProcedureName
+            End Sub
+        #End If
+        		
+'         Protected Sub HandleCommand(ByVal NotificationCode As Long, _
+'                                     ByVal Identifier As Integer, ByRef Handled As Boolean) _
+'                 Handles RootWindowElement.Command
+' '            Debug.Print "HandleCommand NotificationCode: ", NotificationCode
+'         End Sub
+        
+        Protected Sub HandleCreate() _
+                Implements VB.IWindowElementEventsCommon.Create
+
+            ' NOTE: changing the property assignments here often means changes to SyncRecreate() too
+            Me.BackColor = BackColor_INIT
+            Me.MonthBackColor = MonthBackColor_INIT
+            Me.TitleBackColor = TitleBackColor_INIT
+            Me.TitleForeColor = TitleForeColor_INIT
+            Me.TrailingForeColor = TrailingForeColor_INIT
+            Me.ForeColor = ForeColor_INIT
+            Me.SetDateRange(MinDate_INIT, MaxDate_INIT)
+            Me.Value = Value_INIT
+            SyncMaxSelCount()
+            SyncScrollRate()
+            SyncStartOfWeek()
+            
+            #If FEATURE_OLEDRAGDROP Then
+            SyncOLEDropMode()
+            #End If
+            
+            InternalSyncFontNow()   ' has to be done before GetRequiredSize
+            SyncToRequiredSize()
+            'Debug.Print "HandleCreate"
+            
+            Dim simulatedNotification As NMDAYSTATE
+            Dim numVisibleMonths As Long = Me.GetMonthRange(True, MonthViewData.LastCachedDayStateStart, MonthViewData.LastCachedDayStateEnd)
+            simulatedNotification.cDayState = numVisibleMonths
+            HandleGetDayState(simulatedNotification)
+            SendMessageLngPtr(MCM_SETDAYSTATE, MonthViewData.LastCachedDayStateMonthCount, VarPtr(MonthViewData.LastCachedDayStateBits(1)))
+        
+            RaiseEvent Initialize()
+            
+            MonthViewData.IsInitialized = True
+        End Sub
+        
+        Protected Sub SyncRecreate() _
+                Handles MultiSelect.OnPropertyLet
+                                        
+            Dim BackColor As Long = Me.BackColor
+            Dim MonthBackColor As Long = Me.MonthBackColor
+            Dim TitleBackColor As Long = Me.TitleBackColor
+            Dim TitleForeColor As Long = Me.TitleForeColor
+            Dim ForeColor As Long = Me.ForeColor
+            Dim MinDate As Date = Me.MinDate
+            Dim MaxDate As Date = Me.MaxDate
+            Dim Value As Date = Me.Value
+            Dim MaxSelCount As Long = Me.MaxSelCount
+            Dim ScrollRate As Long = Me.ScrollRate
+            Dim StartOfWeek As Any = Me.StartOfWeek
+            
+            ' changing these flags in the GWL_STYLE has no effect at runtime, so we have to recreate the control
+            RecreateWindow(GetStyles())
+            
+            Me.BackColor = BackColor
+            Me.MonthBackColor = MonthBackColor
+            Me.TitleBackColor = TitleBackColor
+            Me.TitleForeColor = TitleForeColor
+            Me.ForeColor = ForeColor
+            Me.SetDateRange(MinDate, MaxDate)
+            Me.Value = Value
+            Me.MaxSelCount = MaxSelCount
+            Me.ScrollRate = ScrollRate
+            Me.StartOfWeek = StartOfWeek
+                        
+            InternalSyncFontNow()   ' has to be done before GetRequiredSize
+            SyncToRequiredSize()
+            
+            Dim simulatedNotification As NMDAYSTATE
+            Dim numVisibleMonths As Long = Me.GetMonthRange(True, MonthViewData.LastCachedDayStateStart, MonthViewData.LastCachedDayStateEnd)
+            simulatedNotification.cDayState = numVisibleMonths
+            HandleGetDayState(simulatedNotification)
+            SendMessageLngPtr(MCM_SETDAYSTATE, MonthViewData.LastCachedDayStateMonthCount, VarPtr(MonthViewData.LastCachedDayStateBits(1)))
+        End Sub
+        
+        Protected Sub HandleKeyDown(KeyCode As Long, ByVal ShiftState As Long) _
+                Implements VB.IWindowElementEventsCommon.KeyDown
+            
+            RaiseEvent KeyDown(CInt(KeyCode), CInt(ShiftState))
+        End Sub
+        
+        Protected Sub HandleKeyPress(KeyCode As Integer) _
+                Implements VB.IWindowElementEventsCommonControls.KeyPress
+            
+            RaiseEvent KeyPress(CInt(KeyCode))
+        End Sub
+        
+        Protected Sub HandleKeyUp(KeyCode As Long, ByVal ShiftState As Long) _
+                Implements VB.IWindowElementEventsCommonControls.KeyUp
+            
+            RaiseEvent KeyUp(CInt(KeyCode), CInt(ShiftState))
+        End Sub
+        
+        Protected Sub HandlePreMouseDown(ByVal Button As VBRUN.MouseButtonConstants, _
+                                        ByVal ShiftState As VBRUN.ShiftConstants, _
+                                        ByVal X As Single, ByVal Y As Single, SwallowMessage As Boolean) _
+                Implements VB.IWindowElementEventsCommon.PreMouseDown
+            
+            '     ' Dont do this - we don't want to fight with the internal ComCtls implementation that already captures the mouse
+            '     'BeginMouseCapture(RootWindowElement, True)
+            '     'SetFocus()  ' For some reason, this is required for this control?
+            RaiseEvent MouseDown(CInt(Button), CInt(ShiftState), X, Y)
+                        
+        End Sub
+        
+        Protected Sub HandleMouseMove(ByVal Button As VBRUN.MouseButtonConstants, _
+                                        ByVal ShiftState As VBRUN.ShiftConstants, _
+                                        ByVal X As Single, ByVal Y As Single) _
+                Implements VB.IWindowElementEventsCommon.MouseMove
+                
+            RaiseEvent MouseMove(CInt(Button), CInt(ShiftState), X, Y)
+        End Sub
+        
+        Protected Sub PreMouseUp(ByVal Button As VBRUN.MouseButtonConstants, _
+                                    ByVal ShiftState As VBRUN.ShiftConstants, _
+                                    ByVal X As Single, ByVal Y As Single, SwallowMessage As Boolean) _
+                Implements VB.IWindowElementEventsCommon.PreMouseUp
+
+            Dim ScaledPixX As Double = (X / ControlContext.RuntimeUICtxGetScaleModePixelsMultiplierX())
+            Dim ScaledPixY As Double = (Y / ControlContext.RuntimeUICtxGetScaleModePixelsMultiplierY())
+            Dim PixX As Long = CLng(ScaledPixX * RootWindowElementBase.RuntimeUIGetUnitScale())
+            Dim PixY As Long = CLng(ScaledPixY * RootWindowElementBase.RuntimeUIGetUnitScale())
+            Dim IsDateDblClick As Boolean = False
+            
+            Dim _X As Single = X
+            Dim _Y As Single = Y
+            Dim WasDoubleClick As Boolean
+            
+            If (MonthViewData.LastMouseUpX = X) And (MonthViewData.LastMouseUpY = Y) Then
+                Dim MouseUpTime As LongLong = KERNEL32.GetTickCount()
+                Dim dblClickTime As Long = USER32.GetDoubleClickTime()
+                Dim MouseClickTime As LongLong = (MouseUpTime - MonthViewData.LastMouseUpTime)
+                If MouseClickTime < dblClickTime Then
+                    WasDoubleClick = True
+                	RaiseEvent DblClick()
+                    _X = -1  ' prevent further double click messages
+                    _Y = -1
+                    
+                    Dim hitTest As MonthViewHitTestValues = Me.HitTest(PixX, PixY)
+                    If hitTest = MCHT_CALENDARDATE Then
+                        RaiseEvent DateDblClick(Me.Value)
+                        IsDateDblClick = True
+                    End If
+                End If
+            End If
+            
+            RaiseEvent MouseUp(CInt(Button), CInt(ShiftState), X, Y)
+
+            'If EndMouseCapture() Then
+            If USER32.GetCapture() = RootWindowElementBase.RuntimeUIGetHandle() Then
+                If IsDateDblClick = False Then
+                    If WasDoubleClick = False Then
+                        If IsInRect(ScaledPixX, ScaledPixY) Then
+                            RaiseEvent Click()
+                        End If
+                    End If
+                Else
+                    ' Weird, but this is correct to match Win Common controls
+                    RaiseEvent DateClick(Me.Value)
+                End If
+            End If
+            
+            MonthViewData.LastMouseUpX = _X
+            MonthViewData.LastMouseUpY = _Y
+            MonthViewData.LastMouseUpTime = KERNEL32.GetTickCount()
+            
+            SwallowMessage = False
+            
+        End Sub
+        
+        Protected Sub HandleGotFocus() _
+                Implements VB.IWindowElementEventsUC.GotFocus
+                
+            RaiseEvent GotFocus()
+        End Sub
+
+        Protected Sub HandleLostFocus() _
+                Implements VB.IWindowElementEventsUC.LostFocus
+                
+            RaiseEvent LostFocus()
+        End Sub
+        
+        [Serialize(False)]
+        Public Property Get Parent() As Object ' As Form  FIXME, needs to work also for UCs
+            Return ControlContext.RuntimeUICtxEnsureGetForm()
+        End Property
+        
+        [Serialize(False)]
+        Public Property Get Object() As Object
+            Return Me
+        End Property
+
+        Protected Sub HandleDragOver(ByVal Source As Object, ByVal X As Double, ByVal Y As Double, ByVal State As Long) _
+                Implements VB.IWindowElementEventsAX.DragOver
+            
+            If State = 3 Then
+                RaiseEvent DragDrop(Source, CSng(X), CSng(Y))
+            Else
+                RaiseEvent DragOver(Source, CSng(X), CSng(Y), CInt(State))
+            End If
+        End Sub
+        
+        #If FEATURE_OLEDRAGDROP Then
+        Public Sub OLEDrag()
+            VB.CommonOLEDrag(Me)
+        End Sub
+
+        Protected Sub SyncOLEDropMode() _
+                Handles OLEDropMode.OnPropertyLet
+                
+            BaseSyncOLEDropMode (Me, Me.OLEDropMode, Me.OLEDragDropHandler, False, True)
+        End Sub
+        #End If
+        
+        [Serialize(False)]
+        Public Property Get BackColor() As OLE_COLOR
+            Return SendMessageLng(MCM_GETCOLOR, MonthViewColorArea.MCSC_BACKGROUND, 0)
+        End Property
+        
+        [Serialize(False)]
+        Public Property Let BackColor(ByVal Value As OLE_COLOR)
+            SendMessageLngPtr(MCM_SETCOLOR, MonthViewColorArea.MCSC_BACKGROUND, TranslateColor(Value))
+        End Property
+
+        [Serialize(False)]
+        Public Property Get MonthBackColor() As OLE_COLOR
+            Return SendMessageLng(MCM_GETCOLOR, MonthViewColorArea.MCSC_MONTHBK, 0)
+        End Property
+        
+        [Serialize(False)]
+        Public Property Let MonthBackColor(ByVal Value As OLE_COLOR)
+            SendMessageLngPtr(MCM_SETCOLOR, MonthViewColorArea.MCSC_MONTHBK, TranslateColor(Value))
+        End Property
+        
+        [Serialize(False)]
+        Public Property Get TitleBackColor() As OLE_COLOR
+            Return SendMessageLng(MCM_GETCOLOR, MonthViewColorArea.MCSC_TITLEBK, 0)
+        End Property
+        
+        [Serialize(False)]
+        Public Property Let TitleBackColor(ByVal Value As OLE_COLOR)
+            SendMessageLngPtr(MCM_SETCOLOR, MonthViewColorArea.MCSC_TITLEBK, TranslateColor(Value))
+        End Property
+        
+        [Serialize(False)]
+        Public Property Get TitleForeColor() As OLE_COLOR
+            Return SendMessageLng(MCM_GETCOLOR, MonthViewColorArea.MCSC_TITLETEXT, 0)
+        End Property
+        
+        [Serialize(False)]
+        Public Property Let TitleForeColor(ByVal Value As OLE_COLOR)
+            SendMessageLngPtr(MCM_SETCOLOR, MonthViewColorArea.MCSC_TITLETEXT, TranslateColor(Value))
+        End Property
+        
+        [Serialize(False)]
+        Public Property Get TrailingForeColor() As OLE_COLOR
+            Return SendMessageLng(MCM_GETCOLOR, MonthViewColorArea.MCSC_TRAILINGTEXT, 0)
+        End Property
+        
+        [Serialize(False)]
+        Public Property Let TrailingForeColor(ByVal Value As OLE_COLOR)
+            SendMessageLngPtr(MCM_SETCOLOR, MonthViewColorArea.MCSC_TRAILINGTEXT, TranslateColor(Value))
+        End Property
+        
+        [Serialize(False)]
+        Public Property Get ForeColor() As OLE_COLOR
+            Return SendMessageLng(MCM_GETCOLOR, MonthViewColorArea.MCSC_TEXT, 0)
+        End Property
+        
+        [Serialize(False)]
+        Public Property Let ForeColor(ByVal Value As OLE_COLOR)
+            SendMessageLngPtr(MCM_SETCOLOR, MonthViewColorArea.MCSC_TEXT, TranslateColor(Value))
+        End Property
+        
+        [Serialize(False), DefaultMember]
+        Public Property Get Value() As Date
+            Dim dates(0 To 1) As SYSTEMTIME
+            SendMessageLngPtr(If(MultiSelect, MCM_GETSELRANGE, MCM_GETCURSEL), 0, VarPtr(dates(0)))
+            Return CDate(DateSerial(dates(0).wYear, dates(0).wMonth, dates(0).wDay))
+        End Property
+
+        [Serialize(False), DefaultMember]
+        Public Property Let Value(NewValue As Date)
+        	Dim dates(0 To 1) As SYSTEMTIME
+            If Int(NewValue) >= MinDate And Int(NewValue) <= MaxDate Then
+                 NewValue = CDate(Int(NewValue))
+            Else
+                Err.Raise 35773, , "Date does not fall within the MinDate and MaxDate values"
+            End If
+            Dim OldDate As Date = Value
+            Dim Changed As Boolean = (OldDate <> NewValue)
+            
+            If Changed = True Then
+                With dates(0)
+                    .wYear = CInt(VBA.Year(NewValue))
+                    .wMonth = CInt(VBA.Month(NewValue))
+                    .wDay = CInt(VBA.Day(NewValue))
+                    .wDayOfWeek = CInt(VBA.Weekday(NewValue))
+                End With
+                LSet dates(1) = dates(0)
+                    
+                Dim Cancel As Boolean
+                If MonthViewData.IsInitialized Then
+                    RaiseEvent SelChange(NewValue, NewValue, Cancel)
+                End If
+                If Cancel = False Then
+                    Value_INIT = NewValue
+                    SendMessageLngPtr(If(MultiSelect, MCM_SETSELRANGE, MCM_SETCURSEL), 0, VarPtr(dates(0)))
+                End If
+            End If
+        End Property
+        
+        [Serialize(False)]
+        Public Property Get MinDate() As Date
+        	Dim dates(0 To 1) As SYSTEMTIME
+            If SendMessageLng(MCM_GETRANGE, 0, VarPtr(dates(0))) And GDTR_MIN Then
+                Return CDate(DateSerial(dates(0).wYear, dates(0).wMonth, dates(0).wDay))
+            End If
+        End Property
+        
+        Protected Sub SetDateRange(ByVal minDate As Double, ByVal maxDate As Double)
+        	Dim dates(0 To 1) As SYSTEMTIME
+            With dates(0)
+            	.wYear = CInt(VBA.Year(minDate))
+                .wMonth = CInt(VBA.Month(minDate))
+                .wDay = CInt(VBA.Day(minDate))
+            End With
+            With dates(1)
+                .wYear = CInt(VBA.Year(maxDate))
+                .wMonth = CInt(VBA.Month(maxDate))
+                .wDay = CInt(VBA.Day(maxDate))
+            End With
+            SendMessageLngPtr(MCM_SETRANGE, GDTR_MIN Or GDTR_MAX, VarPtr(dates(0)))
+        End Sub
+
+        [Serialize(False)]
+        Public Property Let MinDate(NewValue As Date)
+            If Int(NewValue) > Me.MaxDate Then
+                Err.Raise 35775, Description:="The value specified for the MinDate is higher than the current value of MaxDate"
+            Else
+                NewValue = CDate(Int(NewValue))
+            End If
+            
+            If Value < NewValue Then Value = NewValue
+            MinDate_INIT = NewValue
+            SetDateRange(NewValue, Me.MaxDate)
+        End Property
+    
+        [Serialize(False)]
+        Public Property Get MaxDate() As Date
+        	Dim dates(0 To 1) As SYSTEMTIME
+            If SendMessageLng(MCM_GETRANGE, 0, VarPtr(dates(0))) And GDTR_MAX Then
+                Return CDate(DateSerial(dates(1).wYear, dates(1).wMonth, dates(1).wDay))
+            End If
+        End Property
+
+        [Serialize(False)]
+        Public Property Let MaxDate(NewValue As Date)
+            If Int(NewValue) < Me.MinDate Then
+                Err.Raise 35775, , "The value specified for MaxDate is lower than the current value of MinDate"
+            Else
+                NewValue = CDate(Int(NewValue))
+            End If
+            
+            If Value > NewValue Then Value = NewValue
+            MaxDate_INIT = NewValue
+            SetDateRange(Me.MinDate, NewValue)
+        End Property
+                	        
+        Protected Sub SyncShowToday() _
+                Handles ShowToday.OnPropertyLet
+
+            RootWindowElementBase.SetStyleFlag(MCS_NOTODAY, Not ShowToday)
+            SyncToRequiredSize()
+        End Sub
+        
+        Protected Sub SyncShowTodayCircle() _
+                Handles ShowTodayCircle.OnPropertyLet
+
+            RootWindowElementBase.SetStyleFlag(MCS_NOTODAYCIRCLE, Not ShowTodayCircle)
+            SyncToRequiredSize()
+        End Sub
+        
+        Protected Sub SyncShowWeekNumbers() _
+                Handles ShowWeekNumbers.OnPropertyLet
+
+            RootWindowElementBase.SetStyleFlag(MCS_WEEKNUMBERS, ShowWeekNumbers)
+            SyncToRequiredSize()
+        End Sub
+        
+        Protected Sub SyncShowTrailingDates() _
+                Handles ShowTrailingDates.OnPropertyLet
+
+            RootWindowElementBase.SetStyleFlag(MCS_NOTRAILINGDATES, Not ShowTrailingDates)
+            SyncToRequiredSize()
+        End Sub
+            
+        Protected Sub SyncExtendedStyles()
+
+            RootWindowElementBase.RuntimeUIGetHandle().SetWindowLongW(VB.GWL_EXSTYLE, GetExtendedStyles())
+        End Sub
+        
+        Protected Sub SyncBorder() _
+        	    Handles BorderStyle.OnPropertyLet, _
+                        Appearance.OnPropertyLet
+                        
+            SyncExtendedStyles()
+                        
+            Dim HasBorder As Boolean = False
+            If Me.BorderStyle = ControlBorderStyleConstants.vbFixedSingleBorder Then
+                If Me.Appearance <> AppearanceConstants.vbAppear3d Then
+                    HasBorder = True
+                End If
+            End If
+            RootWindowElementBase.SetStyleFlag(VB.WS_BORDER, HasBorder)
+        End Sub
+        
+        Protected Sub SyncMaxSelCount() _
+                Handles MaxSelCount.OnPropertyLet
+                
+            If MultiSelect = True Then
+                SendMessageLngPtr(MCM_SETMAXSELCOUNT, MaxSelCount, 0)
+            End If
+        End Sub
+        
+        Protected Sub SyncScrollRate() _
+        	    Handles ScrollRate.OnPropertyLet
+                 
+            SendMessageLngPtr(MCM_SETMONTHDELTA, ScrollRate, 0)
+        End Sub
+        
+        Protected Sub SyncStartOfWeek() _
+                Handles StartOfWeek.OnPropertyLet
+        	
+            Dim startWeek As VbDayOfWeek = Me.StartOfWeek
+            If startWeek = vbUseSystemDayOfWeek Then startWeek = GetSystemDayOfWeek()
+            SendMessageLngPtr(MCM_SETFIRSTDAYOFWEEK, 0, (startWeek + 5) Mod 7)
+        End Sub
+        
+        Protected Sub GetRequiredSize(ByRef out As VB.SIZE, ByVal MonthCols As Long, ByVal MonthRows As Long)
+            Dim singleMinRect As VB.tbRECT
+            Dim maxRect As VB.tbRECT
+            
+            Static supportsSizeRectToMin As Variant
+            If IsEmpty(supportsSizeRectToMin) Then
+                maxRect.Right = 65535
+                maxRect.Bottom = 65535
+                SendMessageLngPtr(MCM_SIZERECTTOMIN, 0, VarPtr(maxRect))
+            	supportsSizeRectToMin = (maxRect.Right <> 65535)
+            End If
+            
+            SendMessageLngPtr(MCM_GETMINREQRECT, 0, VarPtr(singleMinRect))
+            If supportsSizeRectToMin Then
+                maxRect.Right = (singleMinRect.Right - singleMinRect.Left) * MonthCols
+                maxRect.Bottom = (singleMinRect.Bottom - singleMinRect.Top) * MonthRows
+                SendMessageLngPtr(MCM_SIZERECTTOMIN, 0, VarPtr(maxRect))
+                out.cx = (maxRect.Right - maxRect.Left)
+                out.cy = (maxRect.Bottom - maxRect.Top)
+            Else
+                ' This algorithm looks to be correct, at least on Win 11
+                ' FIXME need to test this on XP.  With VisualStyles=False, the border should be the same when comparing MonthRows = 1 and MonthRows = 12
+                Dim padding As Long = If(BorderStyle = vbFixedSingleBorder, If(Appearance = vbAppear3d, 6, 4), 2)
+                
+                Dim todayWidth As Long = 0
+                If ShowToday Then
+                    todayWidth = SendMessageLng(MCM_GETMAXTODAYWIDTH, 0, 0)
+                    If todayWidth > (singleMinRect.Right - singleMinRect.Left) Then
+                        singleMinRect.Right = singleMinRect.Left + todayWidth
+                    End If
+                End If
+                out.cx = (singleMinRect.Right * MonthCols) - ((MonthCols - 1) * padding)
+                If ShowToday = True Then
+                    Dim fontLineHeight As Long = GetFontMetrics().TMHeight + 13
+                    out.cy = (((singleMinRect.Bottom - fontLineHeight) * MonthRows) + fontLineHeight) + ((MonthRows - 1) * (9 - padding))
+                Else
+                    out.cy = (singleMinRect.Bottom * MonthRows) - ((MonthRows - 1) * padding)
+                End If
+            End If
+        End Sub
+                
+        Protected Sub SyncToRequiredSize() _
+        	    Handles MonthColumns.OnPropertyLet, _
+                        MonthRows.OnPropertyLet
+                        
+            If ResizeToFit = True Then
+                Dim size As VB.SIZE
+                GetRequiredSize(size, Me.MonthColumns, Me.MonthRows)
+'                Debug.Print "GetRequiredSize(Width): ", size.cx, Me.RootWindowElement.ScaleX(size.cx, vbPixels, vbScaledPixels)
+                'Debug.Print "MonthView Width before: " & Me.Width
+                With InternalBaseControlInfo
+                    .PixelsWidth = RootWindowElementBase.RuntimeUIScaleX(size.cx, vbPixels, vbScaledPixels)
+                    .PixelsHeight = RootWindowElementBase.RuntimeUIScaleY(size.cy, vbPixels, vbScaledPixels)
+                End With
+                'Debug.Print "****** SyncToRequiredSize", size.cx, Me.Width
+                'Me.InternalSyncDesignerDimensions()
+                
+                'InternalSleep(5000)
+                Me.InternalhWnd.SetWindowPos(0, 0, 0, size.cx, size.cy, VB.SWP_NOMOVE Or VB.SWP_NOACTIVATE Or VB.SWP_NOOWNERZORDER Or VB.SWP_NOZORDER)
+                'Me.ControlContext.ChangedPosition()
+                'Debug.Print "MonthView Width after: " & Me.Width
+                'Stop
+            End If
+        End Sub
+        
+        Protected Sub HandleResize() _
+        	    Implements VB.IWindowElementEventsCommon.Resize
+            
+            ControlContext.RuntimeUICtxScheduleCallback(Me)
+        End Sub
+        
+        Implements IScheduledCallback
+        Protected Sub Execute() _
+                Implements IScheduledCallback.Execute
+            
+            'Debug.Print "****** Callback"
+            SyncToRequiredSize()
+        End Sub
+        
+        Protected Sub HandleSelect(ByRef Notification As NMSELCHANGE)
+            With Notification.STSelStart
+                Dim StartDate As Date = CDate(DateSerial(.wYear, .wMonth, .wDay))
+            End With
+            RaiseEvent DateClick(StartDate)
+        End Sub
+
+        Protected Sub HandleSelChange(ByRef Notification As NMSELCHANGE, MutedReturnValue As Variant)
+            Dim StartDate As Date
+            Dim EndDate As Date
+            With Notification.STSelStart
+                StartDate = CDate(DateSerial(.wYear, .wMonth, .wDay))
+            End With
+            If MultiSelect Then
+                With Notification.STSelEnd
+                    EndDate = CDate(DateSerial(.wYear, .wMonth, .wDay))
+                End With
+            Else
+                EndDate = StartDate
+            End If
+            Dim Cancel As Boolean = False
+            If MonthViewData.IsInitialized Then
+                RaiseEvent SelChange(StartDate, EndDate, Cancel)
+            End If
+            If Cancel Then
+                If IsEmpty(MonthViewData.LastSelectionStart) Then
+                    ' FIXME how to unselect ?
+                Else
+                    ' FIXME this causes mouse capture to be released, which is different behaviour to the Ax common controls
+                    Dim dates(0 To 1) As SYSTEMTIME
+                    With dates(0)
+                        .wYear = CInt(VBA.Year(MonthViewData.LastSelectionStart))
+                        .wMonth = CInt(VBA.Month(MonthViewData.LastSelectionStart))
+                        .wDay = CInt(VBA.Day(MonthViewData.LastSelectionStart))
+                        .wDayOfWeek = CInt(VBA.Weekday(MonthViewData.LastSelectionStart))
+                    End With
+                    With dates(1)
+                        .wYear = CInt(VBA.Year(MonthViewData.LastSelectionEnd))
+                        .wMonth = CInt(VBA.Month(MonthViewData.LastSelectionEnd))
+                        .wDay = CInt(VBA.Day(MonthViewData.LastSelectionEnd))
+                        .wDayOfWeek = CInt(VBA.Weekday(MonthViewData.LastSelectionEnd))
+                    End With
+                    SendMessageLngPtr(If(MultiSelect, MCM_SETSELRANGE, MCM_SETCURSEL), 0, VarPtr(dates(0)))
+                    Exit Sub
+                End If
+            End If
+            MonthViewData.LastSelectionStart = StartDate
+            MonthViewData.LastSelectionEnd = EndDate
+        End Sub
+        
+        Public Function GetMonthRange(ByVal IncludeTrailing As Boolean, Optional ByRef StartDate As Date, Optional ByRef EndDate As Date) As Long
+            Dim dates(1) As SYSTEMTIME
+            Const GMR_VISIBLE As Long = 0
+            Const GMR_DAYSTATE As Long = 1
+            Dim Flags As Long = If(IncludeTrailing, GMR_DAYSTATE, GMR_VISIBLE)
+            GetMonthRange = SendMessageLng(MCM_GETMONTHRANGE, Flags, VarPtr(dates(0)))
+            With dates(0)
+                StartDate = CDate(DateSerial(.wYear, .wMonth, .wDay))
+            End With
+            With dates(1)
+                EndDate = CDate(DateSerial(.wYear, .wMonth, .wDay))
+            End With
+        End Function
+        
+        [Serialize(False)]
+        Public Property Get VisibleDays(ByVal sIndex As Long) As Date
+            If sIndex < 1 Then Err.Raise 380
+            Dim StartDate As Date
+            Dim EndDate As Date
+            Me.GetMonthRange(True, StartDate, EndDate)
+            Dim retVal As Date = CDate(DateAdd("d", sIndex - 1, StartDate))
+            If retVal > EndDate Then Err.Raise 380
+            Return retVal
+        End Property
+        
+        [Serialize(False)]
+        Public Property Get DayBold(ByVal date As Date) As Boolean
+            date = CDate(Int(date))
+            If date < MonthViewData.LastCachedDayStateStart Then Err.Raise 380
+            If date > MonthViewData.LastCachedDayStateEnd Then Err.Raise 380
+            Dim dateIndex As Long = CLng(DateDiff("d", MonthViewData.LastCachedDayStateStart, date))
+            Return MonthViewData.LastCachedDayStateDayStates(dateIndex + 1)
+        End Property
+        
+        [Serialize(False)]
+        Public Property Let DayBold(ByVal date As Date, ByVal Value As Boolean)
+            date = CDate(Int(date))
+            If date < MonthViewData.LastCachedDayStateStart Then Err.Raise 380
+            If date > MonthViewData.LastCachedDayStateEnd Then Err.Raise 380
+            Dim dateIndex As Long = CLng(DateDiff("d", MonthViewData.LastCachedDayStateStart, date))
+            MonthViewData.LastCachedDayStateDayStates(dateIndex + 1) = Value
+            UpdateCachedDayStateBits()
+            SendMessageLngPtr(MCM_SETDAYSTATE, MonthViewData.LastCachedDayStateMonthCount, VarPtr(MonthViewData.LastCachedDayStateBits(1)))
+        End Property
+        
+        Protected Sub UpdateCachedDayStateBits()
+            ' Convert State boolean array to a bitfield array
+            ReDim MonthViewData.LastCachedDayStateBits(MonthViewData.LastCachedDayStateMonthCount) As Long
+            Dim CurrentDate As Date = MonthViewData.LastCachedDayStateStart
+            Dim CurrentDayIndex As Long
+            Dim StartDay As Long = CLng(VBA.Day(CurrentDate))
+            Dim Month As Long
+            Dim Day As Long
+            For Month = 1 To MonthViewData.LastCachedDayStateMonthCount
+                Dim LastDayInMonth As Long = CLng(VBA.Day(DateSerial(CInt(VBA.Year(CurrentDate)), CInt(VBA.Month(CurrentDate)) + 1, 0)))
+                For Day = StartDay To LastDayInMonth
+                    CurrentDayIndex += 1
+                    CurrentDate = CDate(VBA.DateAdd("d", 1, CurrentDate))
+                    If CurrentDayIndex <= UBound(MonthViewData.LastCachedDayStateDayStates) Then
+                        If MonthViewData.LastCachedDayStateDayStates(CurrentDayIndex) Then
+                        MonthViewData.LastCachedDayStateBits(Month) = MonthViewData.LastCachedDayStateBits(Month) Or (2 ^ (Day - 1))
+                        End If
+                    End If
+                Next
+                StartDay = 1
+            Next
+        End Sub
+                
+        Protected Sub HandleGetDayState(ByRef Notification As NMDAYSTATE)
+            
+            ' We don't use Notification.stStart, as we don't get told the end date, so instead use the MCM_GETMONTHRANGE lookup
+            Me.GetMonthRange(True, MonthViewData.LastCachedDayStateStart, MonthViewData.LastCachedDayStateEnd)
+            
+            MonthViewData.LastCachedDayStateMonthCount = Notification.cDayState
+            MonthViewData.LastCachedDayStateNumDays = CLng(VBA.DateDiff("d", MonthViewData.LastCachedDayStateStart, MonthViewData.LastCachedDayStateEnd)) + 1
+            
+            ReDim MonthViewData.LastCachedDayStateDayStates(1 To MonthViewData.LastCachedDayStateNumDays) As Boolean
+            RaiseEvent GetDayBold(MonthViewData.LastCachedDayStateStart, CInt(MonthViewData.LastCachedDayStateNumDays), MonthViewData.LastCachedDayStateDayStates())
+            
+            UpdateCachedDayStateBits()
+            If Notification.prgDayState <> 0 Then
+                KERNEL32.RtlMoveMemory(Notification.prgDayState, VarPtr(MonthViewData.LastCachedDayStateBits(1)), MonthViewData.LastCachedDayStateMonthCount * 4)
+            End If
+        End Sub
+        
+        Protected Sub HandleNotify(ByRef Notification As NMHDR, MutedReturnValue As Variant) _
+                Implements VB.IWindowElementEventsCommonControls.Notify
+            
+            'Debug.Print Now() & " " & CurrentProcedureName & " " & Hex(Notification.Code)
+            Select Case Notification.Code
+            	Case MCN_SELECT
+                    HandleSelect(ByVal VarPtr(Notification))
+                Case MCN_SELCHANGE
+                    HandleSelChange(ByVal VarPtr(Notification), MutedReturnValue)
+                Case MCN_GETDAYSTATE
+                    HandleGetDayState(ByVal VarPtr(Notification))
+            End Select
+        End Sub
+        
+        [Serialize(False)]
+        Public Property Get CalendarCount() As Byte
+            CalendarCount = CByte(SendMessageLng(MCM_GETCALENDARCOUNT, 0, 0))
+        End Property
+
+        [Serialize(False)]
+        Public Property Get DayCount() As Long
+            Return CLng(VBA.Day(CDate(DateSerial(Me.Year, Me.Month + 1, 0))))
+        End Property
+
+        [Serialize(False)]
+        Public Property Get SelStart() As Date
+            Return Me.Value
+        End Property
+
+        [Serialize(False)]
+        Public Property Let SelStart(ByVal NewValue As Date)
+            Dim dates(0 To 1) As SYSTEMTIME
+            If Int(NewValue) >= MinDate And Int(NewValue) <= MaxDate Then
+                 NewValue = CDate(Int(NewValue))
+            Else
+                Err.Raise 35773, , "Date does not fall within the MinDate and MaxDate values"
+            End If
+            Dim OldDate As Date = Me.SelStart
+            Dim Changed As Boolean = (OldDate <> NewValue)
+            
+            If Changed = True Then
+                With dates(0)
+                    .wYear = CInt(VBA.Year(NewValue))
+                    .wMonth = CInt(VBA.Month(NewValue))
+                    .wDay = CInt(VBA.Day(NewValue))
+                    .wDayOfWeek = CInt(VBA.Weekday(NewValue))
+                End With
+                Dim selEnd As Date = Me.SelEnd
+                If selEnd < NewValue Then selEnd = NewValue
+                With dates(1)
+                    .wYear = CInt(VBA.Year(selEnd))
+                    .wMonth = CInt(VBA.Month(selEnd))
+                    .wDay = CInt(VBA.Day(selEnd))
+                    .wDayOfWeek = CInt(VBA.Weekday(selEnd))
+                End With
+                    
+                Dim Cancel As Boolean
+                If MonthViewData.IsInitialized Then
+                    RaiseEvent SelChange(NewValue, selEnd, Cancel)
+                End If
+                If Cancel = False Then
+                SendMessageLngPtr(If(MultiSelect, MCM_SETSELRANGE, MCM_SETCURSEL), 0, VarPtr(dates(0)))
+                End If
+            End If
+        End Property
+
+        [Serialize(False)]
+        Public Property Get SelEnd() As Date
+            Dim dates(0 To 1) As SYSTEMTIME
+            SendMessageLngPtr(If(MultiSelect, MCM_GETSELRANGE, MCM_GETCURSEL), 0, VarPtr(dates(0)))
+            If MultiSelect = False Then
+                Return CDate(DateSerial(dates(0).wYear, dates(0).wMonth, dates(0).wDay))
+            Else
+            	Return CDate(DateSerial(dates(1).wYear, dates(1).wMonth, dates(1).wDay))
+            End If
+        End Property
+
+        [Serialize(False)]
+        Public Property Let SelEnd(ByVal NewValue As Date)
+            Dim dates(0 To 1) As SYSTEMTIME
+            If Int(NewValue) >= MinDate And Int(NewValue) <= MaxDate Then
+                 NewValue = CDate(Int(NewValue))
+            Else
+                Err.Raise 35773, , "Date does not fall within the MinDate and MaxDate values"
+            End If
+            Dim OldDate As Date = Me.SelEnd
+            Dim Changed As Boolean = (OldDate <> NewValue)
+            
+            If Changed = True Then
+                Dim selStart As Date = Me.SelStart
+                If selStart > NewValue Then selStart = NewValue
+
+                With dates(0)
+                    .wYear = CInt(VBA.Year(selStart))
+                    .wMonth = CInt(VBA.Month(selStart))
+                    .wDay = CInt(VBA.Day(selStart))
+                    .wDayOfWeek = CInt(VBA.Weekday(selStart))
+                End With
+                With dates(1)
+                    .wYear = CInt(VBA.Year(NewValue))
+                    .wMonth = CInt(VBA.Month(NewValue))
+                    .wDay = CInt(VBA.Day(NewValue))
+                    .wDayOfWeek = CInt(VBA.Weekday(NewValue))
+                End With
+                    
+                Dim Cancel As Boolean
+                If MonthViewData.IsInitialized Then
+                    RaiseEvent SelChange(selStart, NewValue, Cancel)
+                End If
+                If Cancel = False Then
+                    SendMessageLngPtr(If(MultiSelect, MCM_SETSELRANGE, MCM_SETCURSEL), 0, VarPtr(dates(0)))
+                End If
+            End If
+        End Property
+        
+        Protected Function HitTest(ByVal X As Long, ByVal Y As Long) As MonthViewHitTestValues
+            Dim hitTestInfo As MCHITTESTINFO
+            hitTestInfo.cbSize = LenB(hitTestInfo)
+            hitTestInfo.PT.x = X
+            hitTestInfo.PT.y = Y
+            SendMessageLngPtr(MCM_HITTEST, 0, VarPtr(hitTestInfo))
+            Return hitTestInfo.uHit
+        End Function
+        
+        [Serialize(False)]
+        Public Property Get Year() As Integer
+            Return CInt(VBA.Year(Me.Value))
+        End Property
+
+        [Serialize(False)]
+        Public Property Let Year(ByVal Value As Integer)
+            Me.Value = CDate(DateSerial(CInt(Value), CInt(VBA.Month(Me.Value)), CInt(VBA.Day(Me.Value))))
+        End Property
+
+        [Serialize(False)]
+        Public Property Get Month() As Integer
+            Return CInt(VBA.Month(Me.Value))
+        End Property
+
+        [Serialize(False)]
+        Public Property Let Month(ByVal Value As Integer)
+            If Value <= 0 Or Value >= 13 Then Err.Raise 380
+            Me.Value = CDate(DateSerial(CInt(VBA.Year(Me.Value)), CInt(Value), CInt(VBA.Day(Me.Value))))
+        End Property
+
+        [Serialize(False)]
+        Public Property Get Week() As Integer
+            Dim DayOfWeek As VbDayOfWeek = StartOfWeek
+            Dim DateValue As Date = Me.Value
+            Week = CInt(DatePart("ww", DateValue, DayOfWeek, vbFirstFourDays))
+            If Week > 52 Then
+                ' from VBCCR: DatePart function can return wrong week number (see https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/200299)
+                If DatePart("ww", DateAdd("d", 7, DateValue), DayOfWeek, vbFirstFourDays) = 2 Then
+                    Week = 1
+                End If
+            End If
+        End Property
+
+        [Serialize(False)]
+        Public Property Let Week(ByVal Value As Integer)
+            If Value <= 0 Or Value >= 54 Then Err.Raise 380
+            Dim changeDelta As Long = Value - Me.Week
+            If changeDelta <> 0 Then Me.Value = CDate(DateAdd("ww", changeDelta, Me.Value))
+        End Property
+
+        [Serialize(False)]
+        Public Property Get Day() As Integer
+            Return CInt(VBA.Day(Me.Value))
+        End Property
+
+        [Serialize(False)]
+        Public Property Let Day(ByVal Value As Integer)
+            If Value <= 0 Or Value > Me.DayCount Then Err.Raise 380
+            Me.Value = CDate(DateSerial(CInt(VBA.Year(Me.Value)), CInt(VBA.Month(Me.Value)), Value))
+        End Property
+                    
+        [Serialize(False)]
+        Public Property Get DayOfWeek() As VbDayOfWeek
+            Return CType(Of VbDayOfWeek)(Weekday(Me.Value))
+        End Property
+        
+        Protected Sub HandleValidate(Cancel As Boolean) _
+                Implements VB.IWindowElementEventsCommon.Validate
+
+            RaiseEvent Validate(Cancel)
+        End Sub
+    #End Region
+	
+End Class
+
+[WindowsControl("/miscellaneous/ICONS??/MonthView??.png")]
+[ClassId("1AC604F6-CF3D-4661-BFE3-858DE6449E8C")]
+[InterfaceId("8003392F-3351-4501-9F4B-6F7427BE1A69")]
+[COMCreatable(False)]
+[EventsUseDispInterface]
+Class MonthView
+    Inherits MonthViewBaseCtl
+    
+    Protected Sub Class_BeforeFirstMethodAccess()
+        [_HiddenModule].EnsureContainerIsLoaded(Me)
+    End Sub
+End Class
+#End If
